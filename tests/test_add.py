@@ -3,7 +3,7 @@ import unittest
 from autograd.tensor import Tensor
 
 
-class TestSum(unittest.TestCase):
+class TestTensorAdd(unittest.TestCase):
     def test_sum_simple(self):
         t1 = Tensor([1, 2, 3], requires_grad=True)
         t2 = Tensor([4, 5, 6], requires_grad=True)
@@ -12,6 +12,8 @@ class TestSum(unittest.TestCase):
 
         t3.backward(Tensor([7, 8, 9]))
 
+        assert t1.grad is not None
+        assert t2.grad is not None
         assert t1.grad.data.tolist() == [7, 8, 9]
         assert t2.grad.data.tolist() == [7, 8, 9]
 
@@ -22,7 +24,8 @@ class TestSum(unittest.TestCase):
         t3 = t1 + t2
 
         t3.backward(Tensor([[10, 11, 12], [13, 14, 15]]))
-
+        assert t1.grad is not None
+        assert t2.grad is not None
         assert t1.grad.data.tolist() == [[10, 11, 12], [13, 14, 15]]
         assert t2.grad.data.tolist() == [10 + 13, 11 + 14, 12 + 15]
 
@@ -34,6 +37,8 @@ class TestSum(unittest.TestCase):
 
         t3.backward(Tensor([[10, 11, 12], [13, 14, 15]]))
 
+        assert t1.grad is not None
+        assert t2.grad is not None
         assert t1.grad.data.tolist() == [[10, 11, 12], [13, 14, 15]]
         assert t2.grad.data.tolist() == [[10 + 13, 11 + 14, 12 + 15]]
 
