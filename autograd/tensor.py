@@ -83,6 +83,9 @@ class Tensor:
     def sum(self) -> "Tensor":
         return tensor_sum(self)
 
+    def __add__(self, other: "Tensor") -> "Tensor":
+        return add(self, other)
+
 
 # Function to create a new tensor that is the sum of all elements in a given tensor
 def tensor_sum(t: Tensor) -> Tensor:
@@ -103,3 +106,42 @@ def tensor_sum(t: Tensor) -> Tensor:
         depends_on = []
 
     return Tensor(data, requires_grad, depends_on)  # return new tensor
+
+
+def add(t1: Tensor, t2: Tensor) -> Tensor:
+    data = t1.data + t2.data
+    requires_grad = t1.requires_grad or t2.requires_grad
+
+    if requires_grad:
+
+        def grad_fn1(grad: np.ndarray) -> np.ndarray:
+            # To understand the grads, model the broadcast with tensors as follows:
+            #
+            # T_XY + U_Y = T_XY + 1_X U_Y, where 1_X has all entries 1_x = 1
+            # T_XY + U_X'Y = T_XY + 1_XX' U_X'Y, where 1_XX' has all entries 1_xx' = 1
+            #                                          and dim(X') = 1 (einsum assumed)
+            #
+            # With this, one can calculate the grads with the usual chain rule
+            dims_added = len(grad.shape) - len(t1.shape)
+            for _ in range(dims_added):
+                grad = grad.sum(axis=0)
+
+            for i, dim in enumerate(t1.shape):
+                if dim == 1:
+                    grad = grad.sum(axis=i, keepdims=True)
+            return grad * np.ones_like(t1.data)
+
+        def grad_fn2(grad: np.ndarray) -> np.ndarray:
+            dims_added = len(grad.shape) - len(t2.shape)
+            for _ in range(dims_added):
+                grad = grad.sum(axis=0)
+
+            for i, dim in enumerate(t2.shape):
+                if dim == 1:
+                    grad = grad.sum(axis=i, keepdims=True)
+            return grad * np.ones_like(t2.data)
+
+        depends_on = [Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)]
+    else:
+        depends_on = []
+    return Tensor(data, requires_grad, depends_on)
