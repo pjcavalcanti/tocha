@@ -23,6 +23,16 @@ def ensure_array(arrayable: Arrayable) -> np.ndarray:
         return np.array(arrayable)
 
 
+Tensorable = Union[float, int, np.ndarray]
+
+
+def ensure_tensor(tensorable: Tensorable) -> "Tensor":
+    if isinstance(tensorable, Tensor):
+        return tensorable
+    else:
+        return Tensor(tensorable)
+
+
 # Define a class for Tensors (multi-dimensional arrays)
 class Tensor:
     # Initialization of the Tensor class
@@ -72,11 +82,11 @@ class Tensor:
             # grad_fn(grad) = grad * d(self.data)/d(dependency.data)
             #               = d(loss)/d(self.data) * d(self.data)/d(dependency.data)
             #               = d(loss)/d(dependency.data)
-            backward_grad = dependency.grad_fn(
+            backward_grad_data = dependency.grad_fn(
                 grad.data
             )  # compute gradient for dependencies
             dependency.tensor.backward(
-                Tensor(backward_grad)
+                Tensor(backward_grad_data)
             )  # recursively call backward
 
     # Function to compute the sum of tensor elements
@@ -85,6 +95,9 @@ class Tensor:
 
     def __add__(self, other: "Tensor") -> "Tensor":
         return add(self, other)
+
+    def __mul__(self, other: "Tensor") -> "Tensor":
+        return mul(self, other)
 
 
 # Function to create a new tensor that is the sum of all elements in a given tensor
@@ -106,6 +119,45 @@ def tensor_sum(t: Tensor) -> Tensor:
         depends_on = []
 
     return Tensor(data, requires_grad, depends_on)  # return new tensor
+
+
+def mul(t1: Tensor, t2: Tensor) -> Tensor:
+    data = t1.data * t2.data
+    requires_grad = t1.requires_grad or t2.requires_grad
+
+    if requires_grad:
+
+        def grad_fn1(
+            grad: np.ndarray,
+        ) -> np.ndarray:  # remember insde backwards() we call grad_fn(grad.data)
+            grad = grad.data * t2.data
+
+            dims_added = len(grad.shape) - len(t2.shape)
+            for _ in range(dims_added):
+                grad = grad.sum(axis=0)
+
+            for index, dimension in enumerate(t2.shape):
+                if dimension == 1:
+                    grad = grad.sum(axis=index, keepdims=True)
+
+            return grad
+
+        def grad_fn2(grad: Tensor) -> Tensor:
+            grad = grad.data * t1.data
+
+            dims_added = len(grad.shape) - len(t1.shape)
+            for _ in range(dims_added):
+                grad = grad.sum(axis=0)
+
+            for index, dimension in enumerate(t1.shape):
+                if dimension == 1:
+                    grad = grad.sum(axis=index, keepdims=True)
+
+            return grad
+
+    return Tensor(
+        data, requires_grad, [Dependency(t1, grad_fn1), Dependency[t2, grad_fn2]]
+    )
 
 
 def add(t1: Tensor, t2: Tensor) -> Tensor:
