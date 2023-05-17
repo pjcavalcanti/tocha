@@ -5,7 +5,7 @@
 
 # import necessary libraries
 import numpy as np
-from typing import List, Callable, NamedTuple, Union, Optional
+from typing import List, Callable, NamedTuple, Tuple, Union, Optional
 
 
 # Define a NamedTuple to store a tensor and its gradient function
@@ -16,6 +16,7 @@ class Dependency(NamedTuple):
 
 Arrayable = Union[float, int, list, np.ndarray]
 Tensorable = Union[Arrayable, "Tensor"]
+Index = Union[int, slice, Tuple[Union[int, slice], ...]]
 
 
 def ensure_array(arrayable: Arrayable) -> np.ndarray:
@@ -78,6 +79,9 @@ class Tensor:
 
     # Function to compute the sum of tensor elements
 
+    def __getitem__(self, idx: Index) -> "Tensor":
+        return getitem(self, idx)
+
     def sum(self) -> "Tensor":
         return tensor_sum(self)
 
@@ -121,17 +125,19 @@ class Tensor:
         return matmultensor(ensure_tensor(other), self)  # not commutative
 
 
-def tensor_sum(t: Tensor) -> Tensor:
-    data = t.data.sum()
-    requires_grad = t.requires_grad
+def getitem(t1: Tensor, idx: Index) -> Tensor:
+    data = t1.data[idx]
+    requires_grad = t1.requires_grad
     depends_on = []
 
     if requires_grad:
 
         def grad_fn(grad: Tensor) -> Tensor:
-            return Tensor(np.multiply(grad.data, np.ones_like(t.data)))
+            new_grad_data = np.zeros_like(t1.data)
+            new_grad_data[idx] = grad.data
+            return Tensor(new_grad_data)
 
-        depends_on.extend([Dependency(t, grad_fn)])
+        depends_on.append(Dependency(t1, grad_fn))
 
     return Tensor(data, requires_grad, depends_on)
 
@@ -147,7 +153,7 @@ def neg(t1: Tensor) -> Tensor:
             new_grad_data = np.negative(np.multiply(grad.data, np.ones_like(grad)))
             return Tensor(new_grad_data)
 
-        depends_on.extend([Dependency(t1, grad_fn)])
+        depends_on.append(Dependency(t1, grad_fn))
     return Tensor(data, requires_grad, depends_on)
 
 
@@ -162,7 +168,22 @@ def inv(t1: Tensor) -> Tensor:
             new_grad_data = np.negative(np.multiply(grad.data, 1 / (t1.data**2)))
             return Tensor(new_grad_data)
 
-        depends_on.extend([Dependency(t1, grad_fn)])
+        depends_on.append(Dependency(t1, grad_fn))
+
+    return Tensor(data, requires_grad, depends_on)
+
+
+def tensor_sum(t: Tensor) -> Tensor:
+    data = t.data.sum()
+    requires_grad = t.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            return Tensor(np.multiply(grad.data, np.ones_like(t.data)))
+
+        depends_on.append(Dependency(t, grad_fn))
 
     return Tensor(data, requires_grad, depends_on)
 
@@ -239,6 +260,7 @@ def sub(t1: Tensor, t2: Tensor) -> Tensor:
             return Tensor(np.multiply(new_grad_data, np.ones_like(t2.data)))
 
         depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
+
     return Tensor(data, requires_grad, depends_on)
 
 
