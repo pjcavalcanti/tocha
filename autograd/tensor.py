@@ -78,6 +78,14 @@ class Tensor:
             dependency.tensor.backward(backward_grad)
 
     # Function to compute the sum of tensor elements
+    def __iter__(self):
+        if self.ndims == 1:
+            for item in self.data:
+                yield Tensor(item)
+        else:
+            raise ValueError(
+                "Iteration over multi-dimensional Tensors is not supported."
+            )
 
     def __getitem__(self, idx: Index) -> "Tensor":
         return getitem(self, idx)

@@ -23,8 +23,8 @@ class Module:
         for var in vars(self).items():
             if isinstance(var[1], Parameter):
                 params.append(var[1])
-            if isinstance(var, Module):
-                params.extend(var.parameters())
+            if isinstance(var[1], Module):
+                params.extend(var[1].parameters())
         return params
 
 
