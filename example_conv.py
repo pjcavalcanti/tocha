@@ -4,10 +4,12 @@ from tocha.functional import relu, sigmoid
 import matplotlib.pyplot as plt
 import numpy as np
 
-kernel = np.ones((2, 2))
+
 # kernel dim
-kernel_height = kernel.shape[0]
-kernel_width = kernel.shape[1]
+kernel_size = (2, 2)
+kernel_height = kernel_size[0]
+kernel_width = kernel_size[1]
+kernel = np.ones(kernel_size)
 # image dim
 img_height = 5
 img_width = 6
