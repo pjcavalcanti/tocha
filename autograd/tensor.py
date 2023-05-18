@@ -45,7 +45,7 @@ class Tensor:
         self.depends_on = depends_on or []
 
         self.shape = self.data.shape
-        self.ndims = self.data.ndim
+        self.ndim = self.data.ndim
         self.grad: Optional["Tensor"] = None
 
         if self.requires_grad:
@@ -79,7 +79,7 @@ class Tensor:
 
     # Function to compute the sum of tensor elements
     def __iter__(self):
-        if self.ndims == 1:
+        if self.ndim == 1:
             for item in self.data:
                 yield Tensor(item)
         else:
@@ -200,6 +200,41 @@ def eq(t1: Tensor, t2: Tensor):
     if t1.shape == t2.shape and t1.data.tolist() == t2.data.tolist():
         return True
     return False
+
+
+def ndot(t1: Tensor, t2: Tensor, n: int) -> Tensor:
+    data = np.tensordot(
+        t1.data,
+        t2.data,
+        (
+            tuple(range(t1.data.ndim - n, t1.data.ndim)),
+            tuple(range(t2.data.ndim - n, t2.data.ndim)),
+        ),
+    )
+    requires_grad = t1.requires_grad or t2.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn1(grad: Tensor) -> Tensor:
+            limits = (
+                tuple(range(grad.data.ndim - (t2.data.ndim - n), grad.data.ndim)),
+                tuple(range(0, t2.data.ndim - n)),
+            )
+            new_grad_data = np.tensordot(grad.data, t2.data, limits)
+            return Tensor(new_grad_data)
+
+        def grad_fn2(grad: Tensor) -> Tensor:
+            limits = (
+                tuple(range(0, t1.data.ndim - n)),
+                tuple(range(0, t1.data.ndim - n)),
+            )
+            new_grad_data = np.tensordot(grad.data, t1.data, limits)
+            return Tensor(new_grad_data)
+
+        depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
+
+    return Tensor(data, requires_grad, depends_on)
 
 
 def add(t1: Tensor, t2: Tensor) -> Tensor:
@@ -324,14 +359,14 @@ def matmultensor(t1: Tensor, t2: Tensor) -> Tensor:
     if requires_grad:
 
         def grad_fn1(grad: Tensor) -> Tensor:
-            n = t2.ndims - 1
+            n = t2.ndim - 1
             new_grad_data = np.tensordot(
                 grad.data, t2.data, axes=(tuple(range(-n, 0)), tuple(range(-n, 0)))
             )
             return Tensor(new_grad_data)
 
         def grad_fn2(grad: Tensor) -> Tensor:
-            n = t1.ndims - 1
+            n = t1.ndim - 1
             new_grad_data = np.tensordot(
                 t1.data, grad.data, axes=(tuple(range(0, n)), tuple(range(0, n)))
             )
