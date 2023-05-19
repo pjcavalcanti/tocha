@@ -202,6 +202,72 @@ def eq(t1: Tensor, t2: Tensor):
     return False
 
 
+def _get_final_order(original_shape, scrambled_order):
+    n = len(original_shape)
+    remaining_dims = [i for i in range(1, n + 1) if i not in scrambled_order]
+    final_order = remaining_dims + scrambled_order
+    return final_order
+
+
+def _unscramble(tensor, original_shape, scrambled_order):
+    final_order = _get_final_order(original_shape, scrambled_order)
+    # Compute inverse permutation
+    inverse_permutation = [final_order.index(i + 1) for i in range(len(final_order))]
+    return tensor.permute(inverse_permutation)
+
+
+def tensordot(
+    t1: Tensor, t2: Tensor, idx: Tuple[Tuple[int, ...], Tuple[int, ...]]
+) -> Tensor:
+    data = np.tensordot(t1.data, t2.data, idx)
+    requires_grad = t1.requires_grad or t2.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn1(grad: Tensor) -> Tensor:
+            original_shape = list(range(t2.ndim))
+            indices_to_delete = list(idx[1])
+            t2_idx = [
+                val
+                for i, val in enumerate(original_shape)
+                if i not in indices_to_delete
+            ]
+            limits = (list(range(grad.ndim - len(t2_idx), grad.ndim)), t2_idx)
+            new_grad_data = np.tensordot(grad.data, t2.data, limits)
+
+            permuted_indices = [i for i in range(t1.ndim) if i not in idx[0]] + [
+                i for i, _ in sorted(zip(idx[0], idx[1]), key=lambda pair: pair[1])
+            ]
+            original_order = [
+                permuted_indices.index(i) for i in range(len(permuted_indices))
+            ]
+            new_grad_data = np.transpose(new_grad_data, original_order)
+
+            return Tensor(new_grad_data)
+
+        def grad_fn2(grad: Tensor) -> Tensor:
+            indices_to_delete = list(idx[0])
+            t1_idx = list(range(t1.ndim))
+            t1_idx = [val for i, val in enumerate(t1_idx) if i not in indices_to_delete]
+            limits = (list(range(len(t1_idx))), t1_idx)
+            new_grad_data = np.tensordot(grad.data, t1.data, limits)
+
+            permuted_indices = [i for i in range(t2.ndim) if i not in idx[1]] + [
+                i for _, i in sorted(zip(idx[0], idx[1]), key=lambda pair: pair[0])
+            ]
+            original_order = [
+                permuted_indices.index(i) for i in range(len(permuted_indices))
+            ]
+            new_grad_data = np.transpose(new_grad_data, original_order)
+
+            return Tensor(new_grad_data)
+
+        depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
+
+    return Tensor(data, requires_grad, depends_on)
+
+
 def ndot(t1: Tensor, t2: Tensor, n: int) -> Tensor:
     data = np.tensordot(
         t1.data,

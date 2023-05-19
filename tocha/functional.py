@@ -48,3 +48,19 @@ def tanh(t: Tensor) -> Tensor:
         depends_on.append(Dependency(t, grad_fn))
 
     return Tensor(data, requires_grad, depends_on)
+
+
+def flatten(t1: Tensor) -> Tensor:
+    data = t1.data.flatten()
+    requires_grad = t1.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = grad.data.flatten()
+            return Tensor(new_grad_data)
+
+        depends_on.append(Dependency(t1, grad_fn))
+
+    return Tensor(data, requires_grad, depends_on)
