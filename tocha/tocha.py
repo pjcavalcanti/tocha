@@ -1,12 +1,3 @@
-from autograd.tensor import Tensor, Arrayable, Dependency
-from typing import Optional, List
-
-
-class tensor(Tensor):
-    def __init__(
-        self,
-        data: Arrayable,
-        requires_grad: bool = False,
-        depends_on: Optional[List[Dependency]] = None,
-    ) -> None:
-        super().__init__(data, requires_grad, depends_on)
+# from typing import Optional, List
+# from autograd.tensor import Arrayable, Tuple, Dependency, Tensor, ensure_array
+# import numpy as np
