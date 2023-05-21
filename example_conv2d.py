@@ -32,7 +32,7 @@ def conv2dcol(x, in_features, out_features, kernel_size):
 
 def test_conv2dtorch():
     torch.manual_seed(1)
-    in_features, out_features = 2, 1
+    in_features, out_features = 2, 2
     k1, k2 = 2, 2
     conv = torch.nn.Conv2d(in_features, out_features, (k1, k2), bias=True)
     m, n = 3, 4
@@ -45,12 +45,15 @@ def test_conv2dtorch():
 
     weight = (
         torch.tensor(
-            [[[i + 1 for _ in range(2 * 2)] for i in range(2)] for _ in range(1)]
+            [
+                [[i + 1 for _ in range(k1 * k2)] for i in range(in_features)]
+                for _ in range(out_features)
+            ]
         )
         .reshape((out_features, in_features, k1, k2))
         .float()
     )
-    bias = torch.tensor([3]).float()
+    bias = torch.tensor([3] * out_features).float()
     conv.weight = torch.nn.Parameter(weight)
     conv.bias = torch.nn.Parameter(bias)
 
@@ -100,4 +103,4 @@ def testconv2dlayertorch():
     print(out.int().numpy() == out2.data)
 
 
-testconv2dlayertorch()
+test_conv2dtorch()

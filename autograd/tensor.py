@@ -169,6 +169,22 @@ def reshape(t1: Tensor, shape: Tuple[int, ...]) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
+def transpose(t1: Tensor, axes: Tuple[int, ...]) -> Tensor:
+    data = np.transpose(t1.data, axes=axes)
+    requires_grad = t1.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = np.transpose(grad.data, axes)
+            return Tensor(new_grad_data)
+
+        depends_on.append(Dependency(t1, grad_fn))
+
+    return Tensor(data, requires_grad, depends_on)
+
+
 def neg(t1: Tensor) -> Tensor:
     data = np.negative(t1.data)
     requires_grad = t1.requires_grad
