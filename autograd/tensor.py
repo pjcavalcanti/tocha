@@ -90,6 +90,9 @@ class Tensor:
     def __getitem__(self, idx: Index) -> "Tensor":
         return getitem(self, idx)
 
+    def reshape(self, shape: Tuple[int, ...]) -> "Tensor":
+        return reshape(self, shape)
+
     def sum(self) -> "Tensor":
         return tensor_sum(self)
 
@@ -218,34 +221,25 @@ def eq(t1: Tensor, t2: Tensor):
     return False
 
 
-def ndot(t1: Tensor, t2: Tensor, n: int) -> Tensor:
-    data = np.tensordot(
-        t1.data,
-        t2.data,
-        (
-            tuple(range(t1.data.ndim - n, t1.data.ndim)),
-            tuple(range(t2.data.ndim - n, t2.data.ndim)),
-        ),
-    )
+def concatenate(t1: Tensor, t2: Tensor, axis: int) -> Tensor:
+    data = np.concatenate([t1.data, t2.data], axis=axis)
     requires_grad = t1.requires_grad or t2.requires_grad
     depends_on = []
 
     if requires_grad:
 
         def grad_fn1(grad: Tensor) -> Tensor:
-            limits = (
-                tuple(range(grad.data.ndim - (t2.data.ndim - n), grad.data.ndim)),
-                tuple(range(0, t2.data.ndim - n)),
-            )
-            new_grad_data = np.tensordot(grad.data, t2.data, limits)
+            s = [slice(None)] * t1.ndim
+            s[axis] = slice(0, t1.shape[axis])
+            s = tuple(s)
+            new_grad_data = grad.data[s]
             return Tensor(new_grad_data)
 
         def grad_fn2(grad: Tensor) -> Tensor:
-            limits = (
-                tuple(range(0, t1.data.ndim - n)),
-                tuple(range(0, t1.data.ndim - n)),
-            )
-            new_grad_data = np.tensordot(grad.data, t1.data, limits)
+            s = [slice(None)] * t2.ndim
+            s[axis] = slice(t1.shape[axis], None)
+            s = tuple(s)
+            new_grad_data = grad.data[s]
             return Tensor(new_grad_data)
 
         depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
@@ -393,10 +387,45 @@ def matmultensor(t1: Tensor, t2: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
+def ndot(t1: Tensor, t2: Tensor, n: int) -> Tensor:
+    data = np.tensordot(
+        t1.data,
+        t2.data,
+        (
+            tuple(range(t1.data.ndim - n, t1.data.ndim)),
+            tuple(range(t2.data.ndim - n, t2.data.ndim)),
+        ),
+    )
+    requires_grad = t1.requires_grad or t2.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn1(grad: Tensor) -> Tensor:
+            limits = (
+                tuple(range(grad.data.ndim - (t2.data.ndim - n), grad.data.ndim)),
+                tuple(range(0, t2.data.ndim - n)),
+            )
+            new_grad_data = np.tensordot(grad.data, t2.data, limits)
+            return Tensor(new_grad_data)
+
+        def grad_fn2(grad: Tensor) -> Tensor:
+            limits = (
+                tuple(range(0, t1.data.ndim - n)),
+                tuple(range(0, t1.data.ndim - n)),
+            )
+            new_grad_data = np.tensordot(grad.data, t1.data, limits)
+            return Tensor(new_grad_data)
+
+        depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
+
+    return Tensor(data, requires_grad, depends_on)
+
+
 def tensordot(
-    t1: Tensor, t2: Tensor, idx: Tuple[Tuple[int, ...], Tuple[int, ...]]
+    t1: Tensor, t2: Tensor, axes: Tuple[Tuple[int, ...], Tuple[int, ...]]
 ) -> Tensor:
-    data = np.tensordot(t1.data, t2.data, idx)
+    data = np.tensordot(t1.data, t2.data, axes)
     requires_grad = t1.requires_grad or t2.requires_grad
     depends_on = []
 
@@ -404,7 +433,7 @@ def tensordot(
 
         def grad_fn1(grad: Tensor) -> Tensor:
             original_shape = list(range(t2.ndim))
-            indices_to_delete = list(idx[1])
+            indices_to_delete = list(axes[1])
             t2_idx = [
                 val
                 for i, val in enumerate(original_shape)
@@ -413,8 +442,8 @@ def tensordot(
             limits = (list(range(grad.ndim - len(t2_idx), grad.ndim)), t2_idx)
             new_grad_data = np.tensordot(grad.data, t2.data, limits)
 
-            permuted_indices = [i for i in range(t1.ndim) if i not in idx[0]] + [
-                i for i, _ in sorted(zip(idx[0], idx[1]), key=lambda pair: pair[1])
+            permuted_indices = [i for i in range(t1.ndim) if i not in axes[0]] + [
+                i for i, _ in sorted(zip(axes[0], axes[1]), key=lambda pair: pair[1])
             ]
             original_order = [
                 permuted_indices.index(i) for i in range(len(permuted_indices))
@@ -424,14 +453,14 @@ def tensordot(
             return Tensor(new_grad_data)
 
         def grad_fn2(grad: Tensor) -> Tensor:
-            indices_to_delete = list(idx[0])
+            indices_to_delete = list(axes[0])
             t1_idx = list(range(t1.ndim))
             t1_idx = [val for i, val in enumerate(t1_idx) if i not in indices_to_delete]
             limits = (list(range(len(t1_idx))), t1_idx)
             new_grad_data = np.tensordot(grad.data, t1.data, limits)
 
-            permuted_indices = [i for i in range(t2.ndim) if i not in idx[1]] + [
-                i for _, i in sorted(zip(idx[0], idx[1]), key=lambda pair: pair[0])
+            permuted_indices = [i for i in range(t2.ndim) if i not in axes[1]] + [
+                i for _, i in sorted(zip(axes[0], axes[1]), key=lambda pair: pair[0])
             ]
             original_order = [
                 permuted_indices.index(i) for i in range(len(permuted_indices))

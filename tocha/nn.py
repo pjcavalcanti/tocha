@@ -1,4 +1,5 @@
-from autograd.tensor import Tensor, Arrayable, ensure_array
+from autograd.tensor import Tensor, Arrayable, ensure_array, tensordot
+import tocha.functional as F
 from typing import Any, List, Tuple, Union
 import numpy as np
 
@@ -53,38 +54,32 @@ class Linear(Module):
         return out
 
 
-class Conv1d(Module):
-    def __init__(
-        self,
-        in_channels: int,
-        out_channels: int,
-        kernel_size: int,
-    ):
-        self.in_channels = in_channels
-        self.out_channels = out_channels
+class Conv2d(Module):
+    def __init__(self, in_features, out_features, kernel_size, bias=True):
+        self.in_features = in_features
+        self.out_features = out_features
         self.kernel_size = kernel_size
 
-        self.kernels = ParameterList(
-            [
-                Parameter(np.random.randn(kernel_size, in_channels))
-                for _ in range(out_channels)
-            ]
+        self.weight = Parameter(
+            np.random.randn(out_features, in_features, kernel_size[0] * kernel_size[1])
         )
-        self.bias = Parameter(np.random.randn(out_channels))
+        self.bias = Parameter(np.random.randn(out_features))
 
     def forward(self, x: Tensor) -> Tensor:
-        # Calculate the size of the output tensor
-        out_size = x.shape[-1] - self.kernel_size + 1
-
-        # Initialize the output tensor with zeros
-        out = np.zeros((x.shape[0], self.out_channels, out_size))
-
-        # Loop over each channel
-        for i in range(self.out_channels):
-            # Perform the 1D convolution
-            for j in range(out_size):
-                out[:, i, j] = (
-                    x[:, :, j : j + self.kernel_size] * self.kernels.parameterlist[i]
-                ).sum() + self.bias.data[i]
-
-        return Tensor(out, requires_grad=True)
+        print("Begin forward")
+        print(f"Input: {x.shape}")
+        print(f"Parameters: {self.weight.shape}, {self.bias.shape}")
+        out = F.im2col2d(x, self.kernel_size)
+        # print(out.shape)
+        out = tensordot(
+            out, self.weight, axes=((-3, -2), (1, 2))
+        )  # (B, Cin, W, H) (Cout, Cin, K1*K2)
+        # print(out.shape)
+        b_out = x.shape[0]
+        c_out = self.weight.shape[0]
+        x_out = x.shape[-2] - self.kernel_size[0] + 1
+        y_out = x.shape[-1] - self.kernel_size[1] + 1
+        out = out.reshape((b_out, c_out, x_out, y_out)) + self.bias  # (2,2,2,6)
+        print(f"Output: {out.shape}\n")
+        print("End forward")
+        return out

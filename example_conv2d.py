@@ -1,78 +1,103 @@
+import torch
 import tocha
 import tocha.nn as nn
-from tocha.functional import relu, sigmoid, flatten, tanh
+from tocha.functional import relu, sigmoid, flatten, tanh, im2col2d, im2row2d
 import matplotlib.pyplot as plt
 import numpy as np
-from autograd.tensor import Tensor
+import autograd.tensor as at
+from autograd.tensor import Tensor, tensordot
 
 
-# Let's create a simple sinusoidal function as our data
-np.random.seed(0)
+def conv2dcol(x, in_features, out_features, kernel_size):
+    k1, k2 = kernel_size
+    kernel = tocha.tensor(
+        [
+            [[i + 1 for _ in range(k1 * k2)] for i in range(in_features)]
+            for _ in range(out_features)
+        ]
+    )  # (c_out, c_in, k1*k2)
+    bias = tocha.tensor([3 for _ in range(out_features)])
+    print(kernel.shape)
+    out = im2col2d(x, (k1, k2))
+    out = tensordot(out, kernel, axes=((-3, -2), (1, 2)))  # (2,2,6,2) (2,4)
 
-# Create a sequence data
-x = np.linspace(0, 10, 500)
-y = np.sin(x) + np.random.normal(0, 0.1, len(x))
+    b_out = x.shape[0]
+    c_out = kernel.shape[0]
+    x_out = x.shape[-2] - k1 + 1
+    y_out = x.shape[-1] - k2 + 1
+    out = out.reshape((b_out, c_out, x_out, y_out)) + bias  # (2,2,2,6)
 
-# Normalize input to (0, 1) range
-x = (x - x.min()) / (x.max() - x.min())
-y = (y - y.min()) / (y.max() - y.min())
-
-# Reshape to (N, C, L) format, where N is batch size, C is number of channels, and L is length
-x = x.reshape(1, 1, -1)
-y = y.reshape(1, 1, -1)
-
-
-class SimpleConv1dModel(nn.Module):
-    def __init__(self):
-        self.conv1 = nn.Conv1d(in_channels=1, out_channels=16, kernel_size=5)
-        self.fc1 = nn.Linear(in_features=16 * (len(x[0][0]) - 5 + 1), out_features=1)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.conv1(x)
-        x = relu(x)
-        x = flatten(x)  # Flatten
-        x = self.fc1(x)
-        return x
+    return out
 
 
-# Hyperparameters
-learning_rate = 0.01
-num_epochs = 100
+def test_conv2dtorch():
+    torch.manual_seed(1)
+    in_features, out_features = 2, 1
+    k1, k2 = 2, 2
+    conv = torch.nn.Conv2d(in_features, out_features, (k1, k2), bias=True)
+    m, n = 3, 4
+    a = np.array([i + 1 for i in range(n * m)]).reshape(m, n)
+    b = np.array([i + 2 for i in range(n * m)]).reshape(m, n)
+    c = np.array([i + 3 for i in range(n * m)]).reshape(m, n)
+    d = np.array([i + 4 for i in range(n * m)]).reshape(m, n)
+    x = np.array([[a, b], [c, d]])  # (2,2,3,4)
+    x = torch.from_numpy(x).float()
 
-# Instantiate the model
-model = SimpleConv1dModel()
+    weight = (
+        torch.tensor(
+            [[[i + 1 for _ in range(2 * 2)] for i in range(2)] for _ in range(1)]
+        )
+        .reshape((out_features, in_features, k1, k2))
+        .float()
+    )
+    bias = torch.tensor([3]).float()
+    conv.weight = torch.nn.Parameter(weight)
+    conv.bias = torch.nn.Parameter(bias)
+
+    out = conv(x)
+    out2 = conv2dcol(x, in_features, out_features, (k1, k2))
+
+    print("Checking if torch conv2d equals pytorch implementation")
+    print(out.int().numpy() == out2.data)
 
 
-# Loss function
-def loss_fn(y_pred: Tensor, y: Tensor) -> Tensor:
-    return ((y_pred - y) * (y_pred - y)).sum()
+def testconv2dlayertorch():
+    torch.manual_seed(1)
+    in_features, out_features = 2, 1
+    k1, k2 = 2, 2
+    conv = torch.nn.Conv2d(in_features, out_features, (k1, k2), bias=True)
+    convmanual = nn.Conv2d(in_features, out_features, (k1, k2), bias=True)
+    m, n = 3, 4
+    a = np.array([i + 1 for i in range(n * m)]).reshape(m, n)
+    b = np.array([i + 2 for i in range(n * m)]).reshape(m, n)
+    c = np.array([i + 3 for i in range(n * m)]).reshape(m, n)
+    d = np.array([i + 4 for i in range(n * m)]).reshape(m, n)
+    x = np.array([[a, b], [c, d]])  # (2,2,3,4)
+    x = torch.from_numpy(x).float()
+
+    weight = (
+        torch.tensor(
+            [[[i + 1 for _ in range(2 * 2)] for i in range(2)] for _ in range(1)]
+        )
+        .reshape((out_features, in_features, k1, k2))
+        .float()
+    )
+
+    bias = torch.tensor([3]).float()
+    conv.weight = torch.nn.Parameter(weight)
+    conv.bias = torch.nn.Parameter(bias)
+    convmanual.weight = nn.Parameter(
+        weight.numpy().reshape((out_features, in_features, k1 * k2))
+    )
+    convmanual.bias = nn.Parameter(bias.numpy())
+
+    out = conv(x)
+    out2 = convmanual(x)
+
+    print(out, out2)
+
+    print("Checking if torch conv2d equals pytorch implementation")
+    print(out.int().numpy() == out2.data)
 
 
-# Training loop
-for epoch in range(num_epochs):
-    # Forward pass
-    y_pred = model(Tensor(x))
-
-    # Compute loss
-    loss = loss_fn(y_pred, Tensor(y))
-
-    # Zero gradients
-    model.zero_grad()
-
-    # Backward pass
-    loss.backward()
-
-    # Update weights
-    for param in model.parameters():
-        param.data -= learning_rate * param.grad.data  # type: ignore
-
-    # Print progress
-    if (epoch + 1) % 10 == 0:
-        print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.data}")
-
-# Plot actual vs predicted values
-y_pred = model(Tensor(x)).data.reshape(-1)
-plt.plot(x[0, 0], y[0, 0], label="Actual")
-plt.plot(x[0, 0], y_pred, label="Predicted")
-plt.legend()
-plt.show()
+testconv2dlayertorch()
