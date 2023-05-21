@@ -55,6 +55,7 @@ class Linear(Module):
 
 
 class Conv2d(Module):
+    # TODO: Add padding and stride
     def __init__(
         self,
         in_features: int,

@@ -68,40 +68,54 @@ def flatten(t1: Tensor) -> Tensor:
 
 
 def im2col2d(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
+    # TODO: add stride and padding
+    # Get paramaters
     k1, k2 = kernel_size[0], kernel_size[1]
     m, n = im.shape[-2:]
+    # Get first submatrix as a column
     s = tuple([slice(None) for _ in range(im.ndim - 2)] + [slice(0, k1), slice(0, k2)])
     cols = im[s]
     cols = cols.reshape(im.shape[:-2] + (k1 * k2, 1))
+    # Concatenate the rest of the submatrices as columns
     for i in range(0, m - k1 + 1):
         for j in range(0, n - k2 + 1):
             if (i, j) == (0, 0):
                 continue
+            # Get submatrix
             s = tuple(
                 [slice(None) for _ in range(im.ndim - 2)]
                 + [slice(i, i + k1), slice(j, j + k2)]
             )
             ncol = im[s]
+            # Reshape to column
             ncol = ncol.reshape(im.shape[:-2] + (k1 * k2, 1))
+            # Concatenate
             cols = concatenate(cols, ncol, axis=-1)
     return cols
 
 
 def im2row2d(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
+    # TODO: add stride and padding
+    # Get paramaters
     k1, k2 = kernel_size[0], kernel_size[1]
     m, n = im.shape[-2:]
+    # Get first submatrix as a row
     s = tuple([slice(None) for _ in range(im.ndim - 2)] + [slice(0, k1), slice(0, k2)])
     cols = im[s]
     cols = cols.reshape(im.shape[:-2] + (1, k1 * k2))
+    # Concatenate the rest of the submatrices as rows
     for i in range(0, m - k1 + 1):
         for j in range(0, n - k2 + 1):
             if (i, j) == (0, 0):
                 continue
+            # Get submatrix
             s = tuple(
                 [slice(None) for _ in range(im.ndim - 2)]
                 + [slice(i, i + k1), slice(j, j + k2)]
             )
             ncol = im[s]
+            # Reshape to row
             ncol = ncol.reshape(im.shape[:-2] + (1, k1 * k2))
+            # Concatenate
             cols = concatenate(cols, ncol, axis=-2)
     return cols
