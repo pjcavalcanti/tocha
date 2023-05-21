@@ -35,6 +35,22 @@ def sigmoid(t: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
+def exp(t: Tensor) -> Tensor:
+    data = np.exp(t.data)
+    requires_grad = t.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = np.multiply(grad.data, data)
+            return Tensor(new_grad_data)
+
+        depends_on.append(Dependency(t, grad_fn))
+
+    return Tensor(data, requires_grad, depends_on)
+
+
 def tanh(t: Tensor) -> Tensor:
     data = np.tanh(t.data)
     requires_grad = t.requires_grad

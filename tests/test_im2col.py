@@ -1,13 +1,11 @@
 import unittest
-import numpy as np
-import torch
-from autograd.tensor import Tensor
+import tocha
 from tocha import nn
 from tocha.functional import im2col2d
 
 
 class TestTensorNegate(unittest.TestCase):
-    def test_conv2dlayer_random_inputs(self):
+    def test_conv2dlayer_random_inputs_shape(self):
         maxn = 5
         for k1 in range(1, maxn):
             for k2 in range(1, maxn):
@@ -19,7 +17,7 @@ class TestTensorNegate(unittest.TestCase):
                                 product = 1
                                 for dim in dims:
                                     product *= dim
-                                x = Tensor([i + 1 for i in range(product)])
+                                x = tocha.tensor([i + 1 for i in range(product)])
                                 x = x.reshape(tuple(dims))
 
                                 kernel_size = (k1, k2)

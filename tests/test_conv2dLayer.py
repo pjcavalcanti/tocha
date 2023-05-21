@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import torch
-from autograd.tensor import Tensor
+import tocha
 from tocha import nn
 
 
@@ -19,7 +19,7 @@ class TestTensorNegate(unittest.TestCase):
                                     product = 1
                                     for dim in dims:
                                         product *= dim
-                                    x = Tensor([i + 1 for i in range(product)])
+                                    x = tocha.tensor([i + 1 for i in range(product)])
                                     x = x.reshape(tuple(dims))
 
                                     kernel_size = (k1, k2)
@@ -43,7 +43,7 @@ class TestTensorNegate(unittest.TestCase):
                                 for Cout in range(1, maxn):
                                     dims = [B, Cin, H, W]
                                     x_np = np.random.randn(*dims)
-                                    x = Tensor(x_np)
+                                    x = tocha.tensor(x_np)
                                     x_torch = torch.from_numpy(x_np)
 
                                     kernel_size = (k1, k2)
@@ -52,10 +52,10 @@ class TestTensorNegate(unittest.TestCase):
                                         Cin, Cout, kernel_size, bias=True
                                     )
                                     bias_np = np.random.randn(Cout)
-                                    bias = Tensor(bias_np)
+                                    bias = tocha.tensor(bias_np)
                                     bias_torch = torch.from_numpy(bias_np)
                                     weight_np = np.random.randn(Cout, Cin, k1, k2)
-                                    weight = Tensor(
+                                    weight = tocha.tensor(
                                         weight_np.reshape(Cout, Cin, k1 * k2)
                                     )
                                     weight_torch = torch.from_numpy(weight_np)

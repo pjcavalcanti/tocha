@@ -1,44 +1,10 @@
-from autograd.tensor import Tensor, Arrayable, ensure_array, tensordot, transpose
+import tocha
 import tocha.functional as F
-from typing import Any, List, Tuple, Union
+from tocha.module import Module, Parameter
 import numpy as np
 
-
-class Parameter(Tensor):
-    def __init__(self, data: Union[Arrayable, Tensor]):
-        super().__init__(
-            data.data if isinstance(data, Tensor) else ensure_array(data),
-            requires_grad=True,
-        )
-
-
-class Module:
-    def __call__(self, *args: Any) -> Any:
-        return self.forward(*args)
-
-    def forward(self, *args) -> Tensor:
-        raise NotImplementedError
-
-    def zero_grad(self):
-        for param in self.parameters():
-            param.zero_grad()
-
-    def parameters(self) -> List[Parameter]:
-        params = []
-        for var in vars(self).items():
-            if isinstance(var[1], Parameter):
-                params.append(var[1])
-            if isinstance(var[1], Module):
-                params.extend(var[1].parameters())
-        return params
-
-
-class ParameterList(Module):
-    def __init__(self, parameters: List[Parameter]):
-        self.parameterlist = parameters
-
-    def parameters(self) -> List[Parameter]:
-        return self.parameterlist
+from typing import Tuple
+from autograd.tensor import Tensor, Arrayable, ensure_array
 
 
 class Linear(Module):
@@ -84,7 +50,7 @@ class Conv2d(Module):
         # Apply convolution
         #  out    = # (B, Cin, k1*k2, (H - k1 + 1)*(W - k2 + 1))
         #  weight = # (Cout, Cin, k1*k2)
-        out = tensordot(out, self.weight, axes=((-3, -2), (1, 2)))
+        out = tocha.tensordot(out, self.weight, axes=((-3, -2), (1, 2)))
 
         # Add bias
         # out =  # (B, (H - k1 + 1)*(W - k2 + 1),  Cout)
@@ -95,7 +61,7 @@ class Conv2d(Module):
         # Transpose to get the right index order
         axes = tuple(range(len(out.shape)))
         axes = axes[:-2] + (axes[-1], axes[-2])
-        out = transpose(out, axes=axes)
+        out = tocha.transpose(out, axes=axes)
         # out = (B, Cout, (H - k1 + 1)*(W - k2 + 1))
 
         # Reshape to get the right output shape

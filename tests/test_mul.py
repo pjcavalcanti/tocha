@@ -1,24 +1,24 @@
 import unittest
 import numpy as np
-from autograd.tensor import Tensor
+import tocha
 
 
 class TestTensorMul(unittest.TestCase):
     def test_mul_simple(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
-        t2 = Tensor([4, 5, 6], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
+        t2 = tocha.tensor([4, 5, 6], requires_grad=True)
 
         t3 = t1 * t2
 
         assert t3.data.tolist() == [1 * 4, 2 * 5, 3 * 6]
 
     def test_mul_backward_simple(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
-        t2 = Tensor([4, 5, 6], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
+        t2 = tocha.tensor([4, 5, 6], requires_grad=True)
 
         t3 = t1 * t2
 
-        t3.backward(Tensor([2, 3, 4]))
+        t3.backward(tocha.tensor([2, 3, 4]))
 
         assert t1.grad is not None
         assert t2.grad is not None
@@ -26,12 +26,12 @@ class TestTensorMul(unittest.TestCase):
         assert t2.grad.data.tolist() == [2 * 1, 3 * 2, 4 * 3]  # grad*t1
 
     def test_mul_backward_broadcast1(self):
-        t1 = Tensor([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2,3)
-        t2 = Tensor([7, 8, 9], requires_grad=True)  # (3,) -> (2,3)
+        t1 = tocha.tensor([[1, 2, 3], [4, 5, 6]], requires_grad=True)  # (2,3)
+        t2 = tocha.tensor([7, 8, 9], requires_grad=True)  # (3,) -> (2,3)
 
         t3 = t1 * t2
 
-        t3.backward(Tensor([[10, 11, 12], [13, 14, 15]]))
+        t3.backward(tocha.tensor([[10, 11, 12], [13, 14, 15]]))
 
         assert t1.grad is not None
         assert t2.grad is not None
@@ -46,12 +46,12 @@ class TestTensorMul(unittest.TestCase):
         ]
 
     def test_mul_scalar(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
-        t2 = Tensor(4, requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
+        t2 = tocha.tensor(4, requires_grad=True)
 
         t3 = t1 * t2
 
-        t3.backward(Tensor([5, 6, 7]))
+        t3.backward(tocha.tensor([5, 6, 7]))
 
         assert t1.grad is not None
         assert t2.grad is not None

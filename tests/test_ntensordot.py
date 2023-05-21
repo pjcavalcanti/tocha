@@ -3,25 +3,26 @@ import pytest
 
 import numpy as np
 
-from autograd.tensor import Tensor, ndot
+import tocha
+from autograd.tensor import ndot
 
 
 class TestTensorNDot(unittest.TestCase):
     def test_simple_ndot_as_matmul(self):
         # matmul test
-        t1 = Tensor([[1, 2], [3, 4], [5, 6]], requires_grad=True)  # (3,2)
-        t2 = Tensor([[10], [20]], requires_grad=True)  # (2,1)
+        t1 = tocha.tensor([[1, 2], [3, 4], [5, 6]], requires_grad=True)  # (3,2)
+        t2 = tocha.tensor([[10], [20]], requires_grad=True)  # (2,1)
         t3 = t1 @ t2
 
         # matmul via ndot
-        T1 = Tensor([[1, 2], [3, 4], [5, 6]], requires_grad=True)
-        T2 = Tensor(np.array([[10], [20]]).transpose(), requires_grad=True)
+        T1 = tocha.tensor([[1, 2], [3, 4], [5, 6]], requires_grad=True)
+        T2 = tocha.tensor(np.array([[10], [20]]).transpose(), requires_grad=True)
         T3 = ndot(T1, T2, 1)
 
         assert t3.data.tolist() == [[50], [110], [170]]
         assert T3.data.tolist() == [[50], [110], [170]]
 
-        grad = Tensor([[-1], [-2], [-3]])
+        grad = tocha.tensor([[-1], [-2], [-3]])
         t3.backward(grad)
         T3.backward(grad)
 
@@ -33,8 +34,8 @@ class TestTensorNDot(unittest.TestCase):
         np.testing.assert_array_equal(T1.grad.data, t1.grad.data)  # type: ignore
 
     def test_simple_hilbert_schmidt_ndot(self):
-        t1 = Tensor([[1, 2], [3, 4]], requires_grad=True)  # (2,2)
-        t2 = Tensor([[1, 2], [3, 4]], requires_grad=True)  # (2,2)
+        t1 = tocha.tensor([[1, 2], [3, 4]], requires_grad=True)  # (2,2)
+        t2 = tocha.tensor([[1, 2], [3, 4]], requires_grad=True)  # (2,2)
         t3 = ndot(t1, t2, 2)
 
         assert t3.data.tolist() == 1 * 1 + 2 * 2 + 3 * 3 + 4 * 4

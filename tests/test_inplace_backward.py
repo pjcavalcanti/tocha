@@ -1,11 +1,10 @@
 import unittest
-
-from autograd.tensor import Tensor
+import tocha
 
 
 class TestTensorInPlaceOperations(unittest.TestCase):
     def test_inplace_add1(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
         t1 = t1 + 3
         t1 = t1.sum()
         t1.backward()
@@ -15,7 +14,7 @@ class TestTensorInPlaceOperations(unittest.TestCase):
         assert t1.grad.data.shape == ()
 
     def test_inplace_add2(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
         t2 = t1 + 3
         t2 = t2.sum()
         t2.backward()
@@ -25,7 +24,7 @@ class TestTensorInPlaceOperations(unittest.TestCase):
         assert t1.grad.data.shape == (3,)
 
     def test_inplace_mul1(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
         t1 = t1 * 3
         t1 = t1.sum()
         t1.backward()
@@ -35,7 +34,7 @@ class TestTensorInPlaceOperations(unittest.TestCase):
         assert t1.grad.data.shape == ()
 
     def test_inplace_mul2(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
         t2 = t1 * 3
         t2 = t2.sum()
         t2.backward()
@@ -45,7 +44,7 @@ class TestTensorInPlaceOperations(unittest.TestCase):
         assert t1.grad.data.shape == (3,)
 
     def test_inplace_sequence(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
         t2 = t1 + 3
         t3 = t2 * 2
         t3 = t3.sum()
@@ -56,16 +55,16 @@ class TestTensorInPlaceOperations(unittest.TestCase):
         assert t1.grad.data.shape == (3,)
 
     def test_inplace_with_other_tensors(self):
-        t1 = Tensor([1, 2, 3], requires_grad=True)
-        t2 = Tensor([4, 5, 6], requires_grad=True)
+        t1 = tocha.tensor([1, 2, 3], requires_grad=True)
+        t2 = tocha.tensor([4, 5, 6], requires_grad=True)
 
         t3 = t1 + t2
         t3 = t3 * t2
         t3 = t3.sum()
         t3.backward()
 
-        a = Tensor([1, 2, 3], requires_grad=True)
-        b = Tensor([4, 5, 6], requires_grad=True)
+        a = tocha.tensor([1, 2, 3], requires_grad=True)
+        b = tocha.tensor([4, 5, 6], requires_grad=True)
         c = a + b
         d = c * b
         e = d.sum()
