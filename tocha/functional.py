@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Tuple, Union
 import numpy as np
 from autograd.tensor import Tensor, Dependency, concatenate
 
@@ -50,6 +50,10 @@ def exp(t: Tensor) -> Tensor:
 
     return Tensor(data, requires_grad, depends_on)
 
+def softmax(t1: Tensor, dim: Union[int, Tuple[int,...]]) -> Tensor:
+    t2 = exp(t1)
+    t2 = t2 / t2.sum(axis=dim, keepdims=True)
+    return t2
 
 def tanh(t: Tensor) -> Tensor:
     data = np.tanh(t.data)
