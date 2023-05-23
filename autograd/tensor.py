@@ -484,7 +484,7 @@ def tensordot(
             new_grad_data = np.tensordot(grad.data, t2.data, limits)
 
             permuted_indices = [i for i in range(t1.ndim) if i not in axes[0]] + [
-                i for i, _ in sorted(zip(axes[0], axes[1]), key=lambda pair: pair[1])
+                i if i>=0 else new_grad_data.ndim + i for i, _ in sorted(zip(axes[0], axes[1]), key=lambda pair: pair[1])
             ]
             original_order = [
                 permuted_indices.index(i) for i in range(len(permuted_indices))

@@ -71,7 +71,7 @@ for e in range(10):
         # print(c[i,y[i].data.tolist()])
         # print(c[np.arange(0, c.shape[0]), idx])
     idx = y.data.tolist()
-    c = c[np.arange(0, c.shape[0]), idx]
-    
-    
+    loss = - F.log(c[np.arange(0, c.shape[0]), idx]).mean()
+    print(loss)
+    loss.backward()
     break
