@@ -93,8 +93,10 @@ class Tensor:
     def reshape(self, shape: Tuple[int, ...]) -> "Tensor":
         return reshape(self, shape)
 
-    def sum(self, axis: Optional[Union[int,Tuple[int,...]]], keepdims: bool=False) -> "Tensor":
-        return sum(t=self, axis=axis, keepdims=keepdims)
+    def sum(
+        self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
+    ) -> "Tensor":
+        return sum(self, axis, keepdims)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -193,7 +195,7 @@ def neg(t1: Tensor) -> Tensor:
     if requires_grad:
 
         def grad_fn(grad: Tensor) -> Tensor:
-            new_grad_data = np.negative(np.multiply(grad.data, np.ones_like(grad)))
+            new_grad_data = np.negative(np.multiply(grad.data, np.ones_like(grad.data)))
             return Tensor(new_grad_data)
 
         depends_on.append(Dependency(t1, grad_fn))
@@ -216,24 +218,32 @@ def inv(t1: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
-def sum(t: Tensor, axis=Optional[Union[int,Tuple[int,...]]], keepdims:bool =False) -> Tensor:
-    data = t.data.sum()
+def sum(
+    t: Tensor, axis: Optional[Union[int, Tuple[int, ...]]], keepdims: bool = False
+) -> Tensor:
+    if axis == ():
+        axis = None
+    data = t.data.sum(axis=axis)
     requires_grad = t.requires_grad
     depends_on = []
 
     if requires_grad:
 
         def grad_fn(grad: Tensor) -> Tensor:
-            new_grad_data = np.zeros_like(t.data)
             if keepdims:
                 new_grad_data = np.multiply(grad.data, np.ones_like(t.data))
             elif axis is not None:
-                new_grad_data = np.multiply(np.expand_dims(grad.data, axis), np.ones_like(t.data))
-            return Tensor(np.multiply(grad.data, np.ones_like(t.data)))
+                new_grad_data = np.multiply(
+                    np.expand_dims(grad.data, axis), np.ones_like(t.data)
+                )
+            else:
+                new_grad_data = np.multiply(grad.data, np.ones_like(t.data))
+            return Tensor(new_grad_data)
 
         depends_on.append(Dependency(t, grad_fn))
 
     return Tensor(data, requires_grad, depends_on)
+
 
 def tensor_sum(t: Tensor) -> Tensor:
     data = t.data.sum()
@@ -250,7 +260,7 @@ def tensor_sum(t: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
-def eq(t1: Tensor, t2: Tensor):
+def eq(t1: Tensor, t2: Tensor) -> bool:
     if t1.shape == t2.shape and t1.data.tolist() == t2.data.tolist():
         return True
     return False
