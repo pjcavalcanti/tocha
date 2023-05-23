@@ -1,7 +1,7 @@
 import unittest
 import tocha
 from tocha import nn
-from tocha.functional import im2col2d
+from tocha.functional import im2col_slow
 
 
 class TestTensorNegate(unittest.TestCase):
@@ -21,7 +21,7 @@ class TestTensorNegate(unittest.TestCase):
                                 x = x.reshape(tuple(dims))
 
                                 kernel_size = (k1, k2)
-                                out = im2col2d(x, kernel_size)
+                                out = im2col_slow(x, kernel_size)
                                 assert out.shape == (
                                     B,
                                     Cin,

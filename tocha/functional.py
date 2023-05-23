@@ -83,7 +83,61 @@ def flatten(t1: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 
-def im2col2d(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
+def _im2col_np(t: np.ndarray, kernel_size: Tuple[int, int]) -> np.ndarray:
+    # TODO: add stride and padding
+    assert len(t.shape) == 4, "tensor must be a 4D array for im2col"
+    # Get paramaters
+    k1, k2 = kernel_size[0], kernel_size[1]
+    batch, c_in, height, width = t.shape
+    # Initialize matrix for submatrices
+    blocks = np.zeros((batch, c_in, k1 * k2, (height - k1 + 1) * (width - k2 + 1)))
+    col = 0
+    for i in range(0, height - k1 + 1):
+        for j in range(0, width - k2 + 1):
+            # Get submatrix
+            block = t[:, :, i : i + k1, j : j + k2].reshape(batch, c_in, k1 * k2)
+            blocks[:, :, :, col] = block
+            col += 1
+    return blocks
+
+
+def _col2im_np(
+    t1: np.ndarray, kernel_size: Tuple[int, int], original_size: Tuple[int, int]
+) -> np.ndarray:
+    print(t1.shape)
+    b, c, hp, wp = t1.shape
+    k1, k2 = kernel_size[0], kernel_size[1]
+    height = original_size[0]
+    width = original_size[1]
+    t2 = np.zeros((b, c, height, width))
+    col = 0
+    for i in range(0, height - k1 + 1):
+        for j in range(0, width - k1 + 1):
+            # Pick a grad block from a column
+            block = t1[:, :, :, col].reshape(b, c, k1, k2)
+            # Increment the grad
+            t2[:, :, i : i + k1, j : j + k2] += block
+            col += 1
+    return t2
+
+
+def im2col(t: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
+    data = _im2col_np(t.data, kernel_size)
+    requires_grad = t.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = _col2im_np(grad.data, kernel_size, t.shape[-2:])
+            return Tensor(new_grad_data)
+
+        depends_on.append(Dependency(t, grad_fn))
+
+    return Tensor(data, requires_grad, depends_on)
+
+
+def im2col_slow(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
     # TODO: add stride and padding
     # Get paramaters
     k1, k2 = kernel_size[0], kernel_size[1]
@@ -110,7 +164,7 @@ def im2col2d(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
     return cols
 
 
-def im2row2d(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
+def im2row_slow(im: Tensor, kernel_size: Tuple[int, int]) -> Tensor:
     # TODO: add stride and padding
     # Get paramaters
     k1, k2 = kernel_size[0], kernel_size[1]

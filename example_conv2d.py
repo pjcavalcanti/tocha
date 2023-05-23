@@ -1,65 +1,58 @@
-import numpy as np
 import tocha
+import torchvision.datasets as datasets
 import tocha.nn as nn
-from tocha.functional import relu, sigmoid, flatten
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
+import tocha.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
+
+mnist = datasets.MNIST(root="./data", train=True, download=True, transform=None)
+
+data = np.expand_dims(mnist.data.numpy(), 1)
+labels = mnist.targets.numpy()
+
+train_split = int(0.8 * len(data))
+x_train, y_train = data[:train_split], labels[:train_split]
+x_test, y_test = data[train_split:], labels[train_split:]
+
+# shuffle data
+idx = np.random.permutation(len(x_train))
+x_train, y_train = x_train[idx], y_train[idx]
+idx = np.random.permutation(len(x_test))
+x_test, y_test = x_test[idx], y_test[idx]
+
+x_train, y_train = tocha.tensor(x_train), tocha.tensor(y_train)
+x_test, y_test = tocha.tensor(x_test), tocha.tensor(y_test)
 
 
-class LeNet(nn.Module):
-    def __init__(self):
-        self.conv1 = nn.Conv2d(1, 6, (5, 5), bias=True)
-        self.conv2 = nn.Conv2d(6, 16, (5, 5), bias=True)
-        self.fc1 = nn.Linear(16 * 4 * 4, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+def get_batch(batch_size=32, split="train"):
+    if split == "train":
+        x, y = x_train, y_train
+    else:
+        x, y = x_test, y_test
+    idx = np.random.randint(0, len(x), batch_size)
+    return x[idx], y[idx]
+
+
+xb, yb = get_batch()
+
+
+class ConvNet(nn.Module):
+    def __init__(self, batch_size=32):
+        self.batch_size = batch_size
+        self.conv1 = nn.Conv2d(1, 3, (3, 3), bias=True)
+        self.conv2 = nn.Conv2d(3, 6, (3, 3), bias=True)
+        self.lin1 = nn.Linear(6 * 24 * 24, 10)
 
     def forward(self, x):
-        x = relu(self.conv1(x))
-        x = relu(self.conv2(x))
-        x = flatten(x)
-        x = relu(self.fc1(x))
-        x = relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+        out = F.relu(self.conv1(x))
+        out = F.relu(self.conv2(out))
+        out = out.reshape((self.batch_size, 6 * 24 * 24))
+        out = self.lin1(out)
+        return out
 
 
-# Load the MNIST dataset
-transform = transforms.Compose(
-    [
-        transforms.ToTensor(),
-        transforms.Normalize((0.1307,), (0.3081,)),
-    ]
-)
-
-train_dataset = datasets.MNIST(
-    "mnist_data/", train=True, download=True, transform=transform
-)
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-
-test_dataset = datasets.MNIST(
-    "mnist_data/", train=False, download=True, transform=transform
-)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-
-# Initialize model
-model = LeNet()
-
-# Training loop
-for epoch in range(10):  # run for 10 epochs
-    for idx, (images, labels) in enumerate(train_loader):
-        # Convert PyTorch Tensor to Numpy array and then to Tocha Tensor
-        images = tocha.tensor(images.numpy())
-        labels = tocha.tensor(labels.numpy())
-
-        outputs = model(images)
-        loss = ((outputs - labels) ** 2).mean()
-
-        loss.backward()  # backward pass
-
-        # Update weights
-        for p in model.parameters():
-            p.data -= 0.01 * p.grad.data  # we are using a learning rate of 0.01
-            p.zero_grad()  # reset gradients
-
-print("Finished Training")
+model = ConvNet()
+for e in range(10):
+    x, y = get_batch()
+    c = model(x)
+    print(e)

@@ -45,8 +45,7 @@ class Conv2d(Module):
             len(x.shape) == 4
         ), "Input tensor must be (batch_size, channels, height, width)"
         # Separate submatrices with im2col
-        out = F.im2col2d(x, self.kernel_size)
-
+        out = F.im2col(x, self.kernel_size)
         # Apply convolution
         #  out    = # (B, Cin, k1*k2, (H - k1 + 1)*(W - k2 + 1))
         #  weight = # (Cout, Cin, k1*k2)
