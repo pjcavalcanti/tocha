@@ -2,12 +2,11 @@ import tocha
 import torch
 import numpy as np
 import tocha.functional as F
+import tocha.nn as nn
 
-x = torch.randn(2,2,2)
-print(x, x.shape)
-expx = torch.exp(x)
-print(expx, expx.shape)
-dim = (1,2)
-sft = expx / expx.sum(dim=dim, keepdim=True)
-print(sft, sft.shape)
-print(expx.sum(dim=dim, keepdim=True), expx.sum(dim=dim, keepdim=True).shape)
+xnp = np.random.randn(1, 1, 3, 3)
+x = tocha.tensor(xnp)
+print(x)
+conv = nn.Conv2d(1, 1, (2, 2), bias=True)
+x = conv(x)
+print(x)

@@ -55,6 +55,20 @@ def softmax(t1: Tensor, dim: Union[int, Tuple[int,...]]) -> Tensor:
     t2 = t2 / t2.sum(axis=dim, keepdims=True)
     return t2
 
+def log(t: Tensor, epsilon = 1e-8) -> Tensor:
+    data = np.log(t.data + epsilon)
+    requires_grad = t.requires_grad
+    depends_on = []
+    
+    if requires_grad:
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = np.multiply(grad.data, 1 / (t.data + epsilon))
+            return Tensor(new_grad_data)
+        
+        depends_on.append(Dependency(t, grad_fn))
+    
+    return Tensor(data, requires_grad, depends_on)
+
 def tanh(t: Tensor) -> Tensor:
     data = np.tanh(t.data)
     requires_grad = t.requires_grad

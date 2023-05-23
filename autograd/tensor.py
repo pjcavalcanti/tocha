@@ -223,7 +223,7 @@ def sum(
 ) -> Tensor:
     if axis == ():
         axis = None
-    data = t.data.sum(axis=axis)
+    data = t.data.sum(axis=axis, keepdims=keepdims)
     requires_grad = t.requires_grad
     depends_on = []
 

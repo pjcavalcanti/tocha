@@ -12,8 +12,8 @@ class Linear(Module):
         self.in_features = in_features
         self.out_features = out_features
 
-        self.weights = Parameter(np.random.randn(in_features, out_features))
-        self.bias = Parameter(np.random.randn(out_features))
+        self.weights = Parameter(np.random.randn(in_features, out_features) / np.sqrt(in_features))
+        self.bias = Parameter(np.random.randn(out_features) / np.sqrt(in_features))
 
     def forward(self, x: Tensor) -> Tensor:
         out = x @ self.weights + self.bias
@@ -35,10 +35,10 @@ class Conv2d(Module):
         self.bias = None
 
         self.weight = Parameter(
-            np.random.randn(out_features, in_features, kernel_size[0] * kernel_size[1])
+            np.random.randn(out_features, in_features, kernel_size[0] * kernel_size[1]) / np.sqrt(in_features)
         )
         if bias:
-            self.bias = Parameter(np.random.randn(out_features))
+            self.bias = Parameter(np.random.randn(out_features) / np.sqrt(in_features))
 
     def forward(self, x: Tensor) -> Tensor:
         assert (
