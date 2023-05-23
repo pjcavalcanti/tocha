@@ -6,7 +6,9 @@ import tocha.nn as nn
 
 xnp = np.random.randn(1, 1, 3, 3)
 x = tocha.tensor(xnp)
-print(x)
-conv = nn.Conv2d(1, 1, (2, 2), bias=True)
-x = conv(x)
-print(x)
+x_torch = torch.tensor(xnp)
+
+m = x.mean()
+m_torch = x_torch.mean()
+
+print(m.data == m_torch.item())

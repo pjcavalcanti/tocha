@@ -97,6 +97,9 @@ class Tensor:
         self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
     ) -> "Tensor":
         return sum(self, axis, keepdims)
+    
+    def mean(self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False) -> "Tensor":
+        return mean(self, axis, keepdims)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -244,21 +247,14 @@ def sum(
 
     return Tensor(data, requires_grad, depends_on)
 
-
-def tensor_sum(t: Tensor) -> Tensor:
-    data = t.data.sum()
-    requires_grad = t.requires_grad
-    depends_on = []
-
-    if requires_grad:
-
-        def grad_fn(grad: Tensor) -> Tensor:
-            return Tensor(np.multiply(grad.data, np.ones_like(t.data)))
-
-        depends_on.append(Dependency(t, grad_fn))
-
-    return Tensor(data, requires_grad, depends_on)
-
+def mean(
+    t: Tensor, axis: Optional[Union[int, Tuple[int, ...]]], keepdims: bool = False
+) -> Tensor:
+    if axis == () or axis is None:
+        size = np.prod(np.array(t.shape))
+    else:
+        size = np.prod(np.array(t.shape)[np.array(axis)])
+    return t.sum(axis=axis, keepdims=keepdims) / size
 
 def eq(t1: Tensor, t2: Tensor) -> bool:
     if t1.shape == t2.shape and t1.data.tolist() == t2.data.tolist():
