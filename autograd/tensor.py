@@ -93,8 +93,8 @@ class Tensor:
     def reshape(self, shape: Tuple[int, ...]) -> "Tensor":
         return reshape(self, shape)
 
-    def sum(self) -> "Tensor":
-        return tensor_sum(self)
+    def sum(self, axis: Optional[Union[int,Tuple[int,...]]], keepdims: bool=False) -> "Tensor":
+        return sum(t=self, axis=axis, keepdims=keepdims)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -215,6 +215,25 @@ def inv(t1: Tensor) -> Tensor:
 
     return Tensor(data, requires_grad, depends_on)
 
+
+def sum(t: Tensor, axis=Optional[Union[int,Tuple[int,...]]], keepdims:bool =False) -> Tensor:
+    data = t.data.sum()
+    requires_grad = t.requires_grad
+    depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = np.zeros_like(t.data)
+            if keepdims:
+                new_grad_data = np.multiply(grad.data, np.ones_like(t.data))
+            elif axis is not None:
+                new_grad_data = np.multiply(np.expand_dims(grad.data, axis), np.ones_like(t.data))
+            return Tensor(np.multiply(grad.data, np.ones_like(t.data)))
+
+        depends_on.append(Dependency(t, grad_fn))
+
+    return Tensor(data, requires_grad, depends_on)
 
 def tensor_sum(t: Tensor) -> Tensor:
     data = t.data.sum()
