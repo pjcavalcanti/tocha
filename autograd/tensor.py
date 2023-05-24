@@ -15,7 +15,7 @@ class Dependency(NamedTuple):
 
 
 Arrayable = Union[float, int, list, np.ndarray]
-Tensorable = Union[Arrayable, "Tensor"]
+Tensorable = Union[float, int, list, np.ndarray, "Tensor"]
 Index = Union[int, slice, Tuple[Union[int, slice], ...]]
 
 
@@ -77,16 +77,6 @@ class Tensor:
             backward_grad = dependency.grad_fn(grad)
             dependency.tensor.backward(backward_grad)
 
-    # Function to compute the sum of tensor elements
-    def __iter__(self):
-        if self.ndim == 1:
-            for item in self.data:
-                yield Tensor(item)
-        else:
-            raise ValueError(
-                "Iteration over multi-dimensional Tensors is not supported."
-            )
-
     def __getitem__(self, idx: Index) -> "Tensor":
         return getitem(self, idx)
 
@@ -97,8 +87,10 @@ class Tensor:
         self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
     ) -> "Tensor":
         return sum(self, axis, keepdims)
-    
-    def mean(self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False) -> "Tensor":
+
+    def mean(
+        self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
+    ) -> "Tensor":
         return mean(self, axis, keepdims)
 
     def __len__(self) -> int:
@@ -247,6 +239,7 @@ def sum(
 
     return Tensor(data, requires_grad, depends_on)
 
+
 def mean(
     t: Tensor, axis: Optional[Union[int, Tuple[int, ...]]], keepdims: bool = False
 ) -> Tensor:
@@ -255,6 +248,7 @@ def mean(
     else:
         size = np.prod(np.array(t.shape)[np.array(axis)])
     return t.sum(axis=axis, keepdims=keepdims) / size
+
 
 def eq(t1: Tensor, t2: Tensor) -> bool:
     if t1.shape == t2.shape and t1.data.tolist() == t2.data.tolist():
@@ -471,43 +465,68 @@ def tensordot(
     depends_on = []
 
     if requires_grad:
+        original_t1_index_order = tuple(range(t1.ndim))
+        original_t2_index_order = tuple(range(t2.ndim))
+        contracted_t2_indices = tuple(
+            i if i >= 0 else t2.ndim + i for i in axes[1]
+        )  # in the order chosen for contraction
+        contracted_t1_indices = tuple(
+            i if i >= 0 else t1.ndim + i for i in axes[0]
+        )  # in the order chosen for contraction
+        non_contracted_t1_indices = tuple(
+            i for i in range(t1.ndim) if i not in contracted_t1_indices
+        )  # in the order of t1
+        non_contracted_t2_indices = tuple(
+            i for i in range(t2.ndim) if i not in contracted_t2_indices
+        )  # in the order of t2
 
         def grad_fn1(grad: Tensor) -> Tensor:
-            original_shape = list(range(t2.ndim))
-            indices_to_delete = list(axes[1])
-            t2_idx = [
-                val
-                for i, val in enumerate(original_shape)
-                if i not in indices_to_delete
-            ]
-            limits = (list(range(grad.ndim - len(t2_idx), grad.ndim)), t2_idx)
-            new_grad_data = np.tensordot(grad.data, t2.data, limits)
-
-            permuted_indices = [i for i in range(t1.ndim) if i not in axes[0]] + [
-                i if i>=0 else new_grad_data.ndim + i for i, _ in sorted(zip(axes[0], axes[1]), key=lambda pair: pair[1])
-            ]
-            original_order = [
-                permuted_indices.index(i) for i in range(len(permuted_indices))
-            ]
-            new_grad_data = np.transpose(new_grad_data, original_order)
-
+            # first we recover the dimensions of t1 via a complementary contraction withg t2
+            grad_indices_from_t2 = tuple(
+                range(grad.ndim)[-len(non_contracted_t2_indices) :]
+            )
+            new_grad_data = np.tensordot(
+                grad.data, t2.data, (grad_indices_from_t2, non_contracted_t2_indices)
+            )
+            # the indexes now are:
+            # (non_contracted t1 indices in the order of t1, contracted t1 indices in the order of t2)
+            # let's create a tuple with the current order of t1 indices:
+            current_t1_index_order = non_contracted_t1_indices + tuple(
+                sorted(
+                    contracted_t1_indices,
+                    key=lambda x: contracted_t2_indices[contracted_t1_indices.index(x)],
+                )
+            )
+            # now we need to permute the axes of the gradient to match the order of t1
+            permutation = tuple(
+                current_t1_index_order.index(i) for i in original_t1_index_order
+            )
+            new_grad_data = np.transpose(new_grad_data, permutation)
             return Tensor(new_grad_data)
 
         def grad_fn2(grad: Tensor) -> Tensor:
-            indices_to_delete = list(axes[0])
-            t1_idx = list(range(t1.ndim))
-            t1_idx = [val for i, val in enumerate(t1_idx) if i not in indices_to_delete]
-            limits = (list(range(len(t1_idx))), t1_idx)
-            new_grad_data = np.tensordot(grad.data, t1.data, limits)
-
-            permuted_indices = [i for i in range(t2.ndim) if i not in axes[1]] + [
-                i for _, i in sorted(zip(axes[0], axes[1]), key=lambda pair: pair[0])
-            ]
-            original_order = [
-                permuted_indices.index(i) for i in range(len(permuted_indices))
-            ]
-            new_grad_data = np.transpose(new_grad_data, original_order)
-
+            # complementary logic to grad_fn1, now the contraction with grad is in swapped order
+            grad_indices_from_t1 = tuple(
+                range(grad.ndim)[: len(non_contracted_t1_indices)]
+            )
+            new_grad_data = np.tensordot(
+                t1.data, grad.data, (non_contracted_t1_indices, grad_indices_from_t1)
+            )
+            current_t2_index_order = (
+                tuple(
+                    sorted(
+                        contracted_t2_indices,
+                        key=lambda x: contracted_t1_indices[
+                            contracted_t2_indices.index(x)
+                        ],
+                    )
+                )
+                + non_contracted_t2_indices
+            )
+            permutation = tuple(
+                current_t2_index_order.index(i) for i in original_t2_index_order
+            )
+            new_grad_data = np.transpose(new_grad_data, permutation)
             return Tensor(new_grad_data)
 
         depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])

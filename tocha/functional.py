@@ -4,6 +4,7 @@ from autograd.tensor import Tensor, Dependency, concatenate
 
 
 def relu(t: Tensor) -> Tensor:
+    # TODO make unit tests
     data = np.maximum(t.data, 0)
     requires_grad = t.requires_grad
     depends_on = []
@@ -20,6 +21,7 @@ def relu(t: Tensor) -> Tensor:
 
 
 def sigmoid(t: Tensor) -> Tensor:
+    # TODO make unit tests
     data = 1 / (1 + np.exp(-t.data))
     requires_grad = t.requires_grad
     depends_on = []
@@ -36,6 +38,7 @@ def sigmoid(t: Tensor) -> Tensor:
 
 
 def exp(t: Tensor) -> Tensor:
+    # TODO make unit tests
     data = np.exp(t.data)
     requires_grad = t.requires_grad
     depends_on = []
@@ -51,9 +54,15 @@ def exp(t: Tensor) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 def softmax(t1: Tensor, dim: Union[int, Tuple[int,...]]) -> Tensor:
+    # TODO make unit tests
     t2 = exp(t1)
     t2 = t2 / t2.sum(axis=dim, keepdims=True)
     return t2
+
+def cross_entropy(x: Tensor, y: Tensor) -> Tensor:
+    # TODO make unit tests
+    out = softmax(x, dim=1)
+    return - log(out[np.arange(0, out.shape[0]), y.data]).mean() # type: ignore
 
 def log(t: Tensor, epsilon = 1e-8) -> Tensor:
     data = np.log(t.data + epsilon)
@@ -70,6 +79,7 @@ def log(t: Tensor, epsilon = 1e-8) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 def tanh(t: Tensor) -> Tensor:
+    # TODO make unit tests
     data = np.tanh(t.data)
     requires_grad = t.requires_grad
     depends_on = []
@@ -86,6 +96,7 @@ def tanh(t: Tensor) -> Tensor:
 
 
 def flatten(t1: Tensor) -> Tensor:
+    # TODO make unit tests
     data = t1.data.flatten()
     requires_grad = t1.requires_grad
     depends_on = []
@@ -122,7 +133,6 @@ def _im2col_np(t: np.ndarray, kernel_size: Tuple[int, int]) -> np.ndarray:
 def _col2im_np(
     t1: np.ndarray, kernel_size: Tuple[int, int], original_size: Tuple[int, int]
 ) -> np.ndarray:
-    print(t1.shape)
     b, c, hp, wp = t1.shape
     k1, k2 = kernel_size[0], kernel_size[1]
     height = original_size[0]

@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 import tocha
+import torch
 
 
 class TestTensorMul(unittest.TestCase):
@@ -57,3 +58,33 @@ class TestTensorMul(unittest.TestCase):
         assert t2.grad is not None
         assert t1.grad.data.tolist() == [20, 24, 28]
         assert t2.grad.data.tolist() == 38
+    def test_compare_torch(self):
+        np.random.seed(0)
+        options = [
+            (np.random.randn(2,3,4,5), np.random.randn(2,3,4,5)),
+            (np.random.randn(2,3,4,5), np.random.randn(3,4,5)),
+            (np.random.randn(2,3,4,5), np.random.randn(4,5)),
+            (np.random.randn(2,3,4,5), np.random.randn(1,3,4,5)),
+            (np.random.randn(2,3,4,5), np.random.randn(1,1,4,5)),
+        ]
+        for i in range(len(options)):
+            anp, bnp = options[i]
+            a = tocha.tensor(anp, requires_grad=True)
+            b = tocha.tensor(bnp, requires_grad=True)
+            a_torch = torch.tensor(anp, requires_grad=True)
+            b_torch = torch.tensor(bnp, requires_grad=True)
+            
+            c =  a * b
+            c_torch = a_torch * b_torch
+            
+            grad = np.random.randn(*c.data.shape)
+            grad_torch = torch.from_numpy(grad)
+            grad = tocha.tensor(grad)
+            
+            print(type(grad), type(grad_torch))
+            
+            c.backward(grad)
+            c_torch.backward(grad_torch)
+            
+            assert np.allclose(c.data, c_torch.data.numpy())
+            assert np.allclose(a.grad.data, a_torch.grad.numpy()) # type: ignore

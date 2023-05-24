@@ -4,6 +4,7 @@ import pytest
 import numpy as np
 
 import tocha
+import torch
 
 
 class TestTensorDot(unittest.TestCase):
@@ -133,3 +134,54 @@ class TestTensorDot(unittest.TestCase):
         #     [0, 3, 1, 2, 4, 5, 6]
         # )  # Xbaedc * Ygfedcba -> Xabcgfde
         # assert T1_grad.shape == t1.grad.shape  # type: ignore
+
+    def setUp(self):
+        # seed for reproducibility
+        np.random.seed(42)
+        torch.manual_seed(42)
+        
+    def test_tensordot(self):
+        for i in range(1, 5):  # Vary the number of dimensions
+            for j in range(1, i+1):  # Vary the places of matching dimensions
+                with self.subTest(i=i, j=j):
+                    shapeA = np.random.randint(1, 5, size=i).tolist()
+                    shapeB = np.random.randint(1, 5, size=i).tolist()
+                    
+                    axes = None
+                    chosenA = []
+                    chosenB = []
+                    for k in range(j):
+                        k1 = np.random.choice(range(len(shapeA)))
+                        while k1 in chosenA:
+                            k1 = np.random.choice(range(len(shapeA)))
+                        k2 = np.random.choice(range(len(shapeB)))
+                        while k2 in chosenB:
+                            k2 = np.random.choice(range(len(shapeB)))
+                        chosenA.append(k1)
+                        chosenB.append(k2)
+                        shapeA[k1] = shapeB[k2]
+                        if axes is None:
+                            axes = ((k1,), (k2,))
+                        else:
+                            axes = (axes[0] + (k1,), axes[1] + (k2,))
+                    
+                    Bnp = np.random.randn(*shapeB)
+                    Anp = np.random.randn(*shapeA)                    
+                    
+                    A = tocha.tensor(Anp, requires_grad=True)
+                    B = tocha.tensor(Bnp, requires_grad=True)
+                    A_torch = torch.tensor(Anp, requires_grad=True, dtype=torch.float32)
+                    B_torch = torch.tensor(Bnp, requires_grad=True, dtype=torch.float32)
+                
+                            
+                    C = tocha.tensordot(A, B, axes=axes) # type: ignore
+                    C_torch = torch.tensordot(A_torch, B_torch, dims=axes) # type: ignore
+                    
+                    grad = tocha.tensor(np.ones_like(C).astype(np.float32))
+                    grad_torch = torch.ones_like(C_torch)
+                    
+                    C.backward(grad)
+                    C_torch.backward(grad_torch)
+                    
+                    self.assertTrue(np.allclose(C.data, C_torch.data.numpy()))  # type: ignore
+                    self.assertTrue(np.allclose(A.grad.data, A_torch.grad.numpy()))  # type: ignore

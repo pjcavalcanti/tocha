@@ -23,3 +23,5 @@ class TestTensorMatMul(unittest.TestCase):
         np.testing.assert_array_equal(t1.grad.data, grad.data @ t2.data.T)  # type: ignore
 
         np.testing.assert_array_equal(t2.grad.data, t1.data.T @ grad.data)  # type: ignore
+            
+        
