@@ -9,6 +9,7 @@ from autograd.tensor import Tensor, Arrayable, ensure_array
 
 class Linear(Module):
     def __init__(self, in_features: int, out_features: int, bias: bool = True):
+        super().__init__()
         self.in_features = in_features
         self.out_features = out_features
 
@@ -29,6 +30,7 @@ class Conv2d(Module):
         kernel_size: Tuple[int, ...],
         bias: bool = True,
     ):
+        super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.kernel_size = kernel_size
@@ -69,3 +71,16 @@ class Conv2d(Module):
         y_out = x.shape[-1] - self.kernel_size[1] + 1
         out = out.reshape((batch, self.out_features, x_out, y_out))
         return out
+
+class Dropout(Module):
+    # currently always in training mode
+    def __init__(self, p: float = 0.5) -> None:
+        super().__init__()
+        self.p = p # probability of dropping a number
+    def forward(self, x: Tensor) -> Tensor:
+        if self.training:
+            mask_np = np.random.binomial(1,1 - self.p,x.shape)
+            mask = tocha.tensor(mask_np, requires_grad=False)
+            return mask * x / (1 - self.p)
+        else:
+            return x

@@ -11,6 +11,18 @@ class Parameter(Tensor):
 
 
 class Module:
+    def __init__(self):
+        self.training = True
+        
+    def eval(self) -> None:
+        self.training = False
+        for child in self.children():
+            child.eval()
+    def train(self) -> None:
+        self.training = True
+        for child in self.children():
+            child.train()
+    
     def __call__(self, *args: Any) -> Any:
         return self.forward(*args)
 
@@ -29,6 +41,13 @@ class Module:
             if isinstance(var[1], Module):
                 params.extend(var[1].parameters())
         return params
+
+    def children(self) -> List["Module"]:
+        child = []
+        for var in vars(self).items():
+            if isinstance(var[1], Module):
+                child.append(var[1])
+        return child
 
 
 class ParameterList(Module):
