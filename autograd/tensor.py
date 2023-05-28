@@ -233,8 +233,6 @@ def sum(
     if requires_grad:
 
         def grad_fn(grad: Tensor) -> Tensor:
-            if t.name is not None:
-                print(t.name)
             if keepdims:
                 new_grad_data = np.multiply(grad.data, np.ones_like(t.data))
             elif axis is not None:

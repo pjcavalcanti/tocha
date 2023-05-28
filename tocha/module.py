@@ -16,10 +16,14 @@ class Module:
         
     def eval(self) -> None:
         self.training = False
+        for p in self.parameters():
+            p.requires_grad = False
         for child in self.children():
             child.eval()
     def train(self) -> None:
         self.training = True
+        for p in self.parameters():
+            p.requires_grad = True
         for child in self.children():
             child.train()
     
