@@ -135,31 +135,50 @@ class BatchNorm1d(Module):
         self.num_features = num_features
         self.eps = eps
         self.momentum = momentum
+        self.adapted = False
         
         self.gamma = Parameter(np.ones(num_features))
         self.beta = Parameter(np.zeros(num_features))
         
-        self.running_mean = Tensor(np.zeros(num_features), requires_grad=False)
-        self.running_std = Tensor(np.ones(num_features), requires_grad=False)
+        self.running_mean = Tensor(0.0, requires_grad=False)
+        self.running_var = Tensor(1.0, requires_grad=False)
         
     def forward(self, x: Tensor) -> Tensor:
-        axis = 0
-        if len(x.shape) == 3:
-            axis = (0, 2)
+        # reshape gamma and beta if necessary
+        # this can cause bugs if the user changes the shape of the input
+        self._adapt_shapes(x)
+        
         if self.training:
-            # Normalize, scale and shift
-            mean = x.mean(axis=axis, keepdims=True)
-            std = (x - mean) ** 2
-            std = std.mean(axis=axis, keepdims=True)
-            std = std + self.eps
-            std = std ** 0.5
-            out = (x - mean) / std
-            out = self.gamma * out + self.beta
-            # Update running mean and variance
-            self.running_mean.data = (1 - self.momentum) * self.running_mean.data + self.momentum * mean.data
-            self.running_std.data = (1 - self.momentum) * self.running_std.data + self.momentum * std.data
+            mean = x.mean(axis=self.axis, keepdims=True)
+            # this is the unbiased variance, so the torch docs are wrong here
+            # actually, the torch docs are wrong in general, because they use the biased variance in the training phase
+            var = ((x - mean) ** 2).mean(axis=self.axis, keepdims=True)
+            
+            # n = x.shape[0] * x.shape[2] if len(x.shape) == 3 else x.shape[0]
+            n = x.shape[0]
+            self.running_mean = Tensor((1 - self.momentum) * self.running_mean.data + self.momentum * mean.data , requires_grad=False)
+            self.running_var = Tensor((1 - self.momentum) * self.running_var.data + self.momentum * var.data * n / (n - 1), requires_grad=False)
         else:
-            # Normalize, scale and shift
-            out = (x - self.running_mean) / (self.running_std + self.eps)
-            out = self.gamma * out + self.beta
+            mean = self.running_mean
+            var = self.running_var
+            
+        out = (x - mean) / (var + self.eps) ** 0.5
+        out = self.gamma * out + self.beta
         return out
+    
+    def _adapt_shapes(self, x: Tensor) -> None:
+        assert len(x.shape) == 2 or len(x.shape) == 3, "Expected 2D or 3D input (got {}D input)".format(len(x.shape))
+        
+        if len(self.gamma.shape) != len(x.shape) and not self.adapted:
+            if len(x.shape) == 2:
+                self.gamma = self.gamma.reshape((1, self.num_features))
+                self.beta = self.beta.reshape((1, self.num_features))
+            elif len(x.shape) == 3:
+                self.gamma = self.gamma.reshape((1, self.num_features, 1))
+                self.beta = self.beta.reshape((1, self.num_features, 1))
+            self.adapted = True
+        
+        if len(x.shape) == 2:
+            self.axis = 0
+        elif len(x.shape) == 3:
+            self.axis = (0, 2)
