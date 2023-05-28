@@ -84,3 +84,27 @@ class Dropout(Module):
             return mask * x / (1 - self.p)
         else:
             return x
+        
+class BatchNorm1d(Module):
+    def __init__(self, num_features:int, eps: float = 1e-5, momentum: float=0.1) -> None:
+        super().__init__()
+        self.num_features = num_features
+        self.eps = eps
+        self.momentum = momentum
+        
+        self.gamma = Parameter(np.ones(num_features))
+        self.beta = Parameter(np.zeros(num_features))
+        
+    def forward(self, x: Tensor) -> Tensor:
+        mean = x.mean(axis=0, keepdims=True)
+        norm1 = x - mean
+        norm2 = norm1 ** 2
+        norm3 = norm2.mean(axis=0, keepdims=True)
+        norm4 = norm3 + self.eps
+        norm5 = norm4 ** 0.5
+        out1 = (x - mean) / norm5
+        out2 = self.gamma * out1 + self.beta
+        return out2
+        
+        
+        

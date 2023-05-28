@@ -39,10 +39,15 @@ class Tensor:
         data: Arrayable,
         requires_grad: bool = False,
         depends_on: Optional[List[Dependency]] = None,
+        name: Optional[str] = None,
     ) -> None:
         self.data = ensure_array(data)
         self.requires_grad = requires_grad
         self.depends_on = depends_on or []
+        if name is not None:
+            self.name = name
+        else:
+            self.name = None
 
         self.shape = self.data.shape
         self.ndim = self.data.ndim
@@ -61,7 +66,7 @@ class Tensor:
     def backward(self, grad: Optional["Tensor"] = None) -> None:
         if not self.requires_grad:
             return
-
+        
         if grad is None:
             # Assuming that we only start the backward pass on the scalar with respect to which we want to differentiate,
             if self.shape == ():
@@ -92,6 +97,9 @@ class Tensor:
         self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
     ) -> "Tensor":
         return mean(self, axis, keepdims)
+    
+    def __pow__(self, other: Union[float, int]) -> "Tensor":
+        return pow(self, other)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -225,6 +233,8 @@ def sum(
     if requires_grad:
 
         def grad_fn(grad: Tensor) -> Tensor:
+            if t.name is not None:
+                print(t.name)
             if keepdims:
                 new_grad_data = np.multiply(grad.data, np.ones_like(t.data))
             elif axis is not None:
@@ -247,8 +257,21 @@ def mean(
         size = np.prod(np.array(t.shape))
     else:
         size = np.prod(np.array(t.shape)[np.array(axis)])
-    return t.sum(axis=axis, keepdims=keepdims) / size
+    return t.sum(axis=axis, keepdims=keepdims) / size # type: ignore
 
+def pow(t: Tensor, exponent: Union[float, int]) -> Tensor:
+    data = np.power(t.data, exponent)
+    requires_grad = t.requires_grad
+    depends_on = []
+    
+    if requires_grad:
+        def grad_fn(grad: Tensor):
+            new_grad_data = exponent * np.multiply(grad.data, np.power(t.data, exponent - 1))
+            return Tensor(new_grad_data)
+    
+        depends_on.append(Dependency(t, grad_fn))
+    
+    return Tensor(data, requires_grad, depends_on)
 
 def eq(t1: Tensor, t2: Tensor) -> bool:
     if t1.shape == t2.shape and t1.data.tolist() == t2.data.tolist():

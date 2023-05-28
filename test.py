@@ -4,24 +4,32 @@ import numpy as np
 import tocha.functional as F
 import tocha.nn as nn
 
-Anp = np.random.randint(0,10,size=(4,5))
 
-A = tocha.tensor(Anp)
-drop = nn.Dropout(p=0.1)
 
-# Bnp = np.random.randn(5, 4, 3, 2)
-# Anp = np.random.randn(2, 3, 4, 5)
+n_features = 4
+batch_size = 3
 
-# A = tocha.tensor(Anp, requires_grad=True)
-# B = tocha.tensor(Bnp, requires_grad=True)
-# A_torch = torch.tensor(Anp, requires_grad=True, dtype=torch.float32)
-# B_torch = torch.tensor(Bnp, requires_grad=True, dtype=torch.float32)
+a_np = np.random.randn(batch_size, n_features).astype(np.float64)
+a = tocha.tensor(a_np, requires_grad = True)
+a_torch = torch.tensor(a.data, requires_grad = True)
 
-# C = tocha.tensordot(A, B, axes=((1,2),(2,1)))
-# C_torch = torch.tensordot(A_torch, B_torch, dims=((1,2),(2,1))) # type: ignore
-# grad = tocha.tensor(np.ones_like(C).astype(np.float32))
-# grad_torch = torch.ones_like(C_torch)
-# C.backward(grad)
-# C_torch.backward(grad_torch)
 
-# print(np.allclose(A.grad.data, A_torch.grad.numpy())) # type: ignore
+norm = nn.BatchNorm1d(n_features)
+norm_torch = torch.nn.BatchNorm1d(n_features, dtype=torch.float64)
+
+out = norm(a)
+out_torch = norm_torch(a_torch)
+
+print(np.allclose(out.data, out_torch.detach().numpy()))
+
+grad_np = np.ones(out.shape).astype(np.float64)
+grad = tocha.tensor(grad_np)
+grad_torch = torch.tensor(grad_np)
+
+out.backward(grad)
+out_torch.backward(grad_torch)
+
+print(a.grad.data)
+print(a_torch.grad.detach().numpy())
+
+print(np.allclose(a.grad.data, a_torch.grad.detach().numpy(), atol = 1e-14))
