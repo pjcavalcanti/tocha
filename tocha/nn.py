@@ -144,18 +144,18 @@ class BatchNorm1d(Module):
         self.running_var = Tensor(1.0, requires_grad=False)
         
     def forward(self, x: Tensor) -> Tensor:
+        assert len(x.shape) == 2 or len(x.shape) == 3, "Input tensor must be (batch_size, num_features) or (batch_size, num_features, seq_len)"
         # reshape gamma and beta if necessary
         # this can cause bugs if the user changes the shape of the input
         self._adapt_shapes(x)
         
         if self.training:
+            # the docs claim the var is biased, but actually it is unbiased only in the forward pass
+            # for the running var, the var is unbiased
             mean = x.mean(axis=self.axis, keepdims=True)
-            # this is the unbiased variance, so the torch docs are wrong here
-            # actually, the torch docs are wrong in general, because they use the biased variance in the training phase
             var = ((x - mean) ** 2).mean(axis=self.axis, keepdims=True)
             
-            # n = x.shape[0] * x.shape[2] if len(x.shape) == 3 else x.shape[0]
-            n = x.shape[0]
+            n = x.shape[0] * x.shape[2] if len(x.shape) == 3 else x.shape[0]
             self.running_mean = Tensor((1 - self.momentum) * self.running_mean.data + self.momentum * mean.data , requires_grad=False)
             self.running_var = Tensor((1 - self.momentum) * self.running_var.data + self.momentum * var.data * n / (n - 1), requires_grad=False)
         else:
@@ -182,3 +182,34 @@ class BatchNorm1d(Module):
             self.axis = 0
         elif len(x.shape) == 3:
             self.axis = (0, 2)
+            
+class BatchNorm2d(Module):
+    def __init__(self, n_features: int, eps: float = 1e-5, momentum: float = 0.1) -> None:
+        super().__init__()
+        self.n_features = n_features
+        self.eps = eps
+        self.momentum = momentum
+        
+        self.gamma = Parameter(np.ones((1, n_features, 1, 1)))
+        self.beta = Parameter(np.zeros((1, n_features, 1, 1)))
+        
+        self.running_mean = Tensor(np.zeros((1, n_features, 1, 1)), requires_grad=False)
+        self.running_var = Tensor(np.ones((1, n_features, 1, 1)), requires_grad=False)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        assert len(x.shape) == 4, "Input tensor must be (batch_size, num_features, height, width)"
+        axis = (0, 2, 3)
+        if self.training:
+            mean = x.mean(axis=axis, keepdims=True)
+            var = ((x - mean) ** 2).mean(axis=axis, keepdims=True)
+            
+            n = x.shape[0] * x.shape[2] * x.shape[3]
+            
+            self.running_mean = Tensor((1 - self.momentum) * self.running_mean.data + self.momentum * mean.data, requires_grad=False)
+            self.running_var = Tensor((1 - self.momentum) * self.running_var.data + self.momentum * var.data * n / (n - 1), requires_grad=False)
+        else:
+            mean = self.running_mean
+            var = self.running_var
+        out = (x - mean) / (var + self.eps) ** 0.5
+        out = self.gamma * out + self.beta
+        return out 
