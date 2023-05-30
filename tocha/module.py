@@ -36,6 +36,9 @@ class Module:
     def zero_grad(self):
         for param in self.parameters():
             param.zero_grad()
+            
+    def register_parameter(self, name: str, p: Parameter) -> None:
+        vars(self)[name] = p
 
     def parameters(self) -> List[Parameter]:
         params = []

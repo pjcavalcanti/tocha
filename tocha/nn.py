@@ -8,32 +8,42 @@ from autograd.tensor import Tensor, Arrayable, ensure_array
 
 ## Non-linearities
 
+
 class ReLU(Module):
     def __init__(self) -> None:
         super().__init__()
+
     def forward(self, x: Tensor) -> Tensor:
         return F.relu(x)
-    
+
+
 class Sigmoid(Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x: Tensor) -> Tensor:
         return F.sigmoid(x)
+
 
 class Tanh(Module):
     def __init__(self):
         super().__init__()
+
     def forward(self, x: Tensor) -> Tensor:
         return F.tanh(x)
-    
+
+
 class Softmax(Module):
     def __init__(self, axis: int = -1):
         super().__init__()
         self.axis = axis
+
     def forward(self, x: Tensor) -> Tensor:
-        return F.softmax(x, dim = self.axis)
+        return F.softmax(x, dim=self.axis)
+
 
 ## Basic layers
+
 
 class Linear(Module):
     def __init__(self, in_features: int, out_features: int, bias: bool = True):
@@ -41,12 +51,15 @@ class Linear(Module):
         self.in_features = in_features
         self.out_features = out_features
 
-        self.weights = Parameter(np.random.randn(in_features, out_features) / np.sqrt(in_features))
+        self.weights = Parameter(
+            np.random.randn(in_features, out_features) / np.sqrt(in_features)
+        )
         self.bias = Parameter(np.random.randn(out_features) / np.sqrt(in_features))
 
     def forward(self, x: Tensor) -> Tensor:
         out = x @ self.weights + self.bias
         return out
+
 
 class Conv2d(Module):
     # TODO: Add padding and stride
@@ -64,7 +77,8 @@ class Conv2d(Module):
         self.bias = None
 
         self.weight = Parameter(
-            np.random.randn(out_features, in_features, kernel_size[0] * kernel_size[1]) / np.sqrt(in_features)
+            np.random.randn(out_features, in_features, kernel_size[0] * kernel_size[1])
+            / np.sqrt(in_features)
         )
         if bias:
             self.bias = Parameter(np.random.randn(out_features) / np.sqrt(in_features))
@@ -99,35 +113,43 @@ class Conv2d(Module):
         out = out.reshape((batch, self.out_features, x_out, y_out))
         return out
 
+
 ## Containers
+
 
 class Sequential(Module):
     def __init__(self, layers: List[Module]) -> None:
         super().__init__()
         self.layers = layers
-        
+
     def forward(self, x: Tensor) -> Tensor:
         out = x
         for layer in self.layers:
             out = layer(out)
         return out
 
+
 ## Regularization layers
+
 
 class Dropout(Module):
     def __init__(self, p: float = 0.5) -> None:
         super().__init__()
-        self.p = p # probability of dropping a number
+        self.p = p  # probability of dropping a number
+
     def forward(self, x: Tensor) -> Tensor:
         if self.training:
-            mask_np = np.random.binomial(1,1 - self.p,x.shape) 
+            mask_np = np.random.binomial(1, 1 - self.p, x.shape)
             mask = tocha.tensor(mask_np, requires_grad=False)
             return mask * x / (1 - self.p)
         else:
             return x
-        
+
+
 class BatchNorm1d(Module):
-    def __init__(self, num_features:int, eps: float = 1e-5, momentum: float=0.1) -> None:
+    def __init__(
+        self, num_features: int, eps: float = 1e-5, momentum: float = 0.1
+    ) -> None:
         # here i use dim rather than num_features, which deviates from pytorch
         # this is because i want to avoid reshape in forward
         # so i can declare gamma and beta with the right shape in init
@@ -136,39 +158,51 @@ class BatchNorm1d(Module):
         self.eps = eps
         self.momentum = momentum
         self.adapted = False
-        
+
         self.gamma = Parameter(np.ones(num_features))
         self.beta = Parameter(np.zeros(num_features))
-        
+
         self.running_mean = Tensor(0.0, requires_grad=False)
         self.running_var = Tensor(1.0, requires_grad=False)
-        
+
     def forward(self, x: Tensor) -> Tensor:
-        assert len(x.shape) == 2 or len(x.shape) == 3, "Input tensor must be (batch_size, num_features) or (batch_size, num_features, seq_len)"
+        assert (
+            len(x.shape) == 2 or len(x.shape) == 3
+        ), "Input tensor must be (batch_size, num_features) or (batch_size, num_features, seq_len)"
         # reshape gamma and beta if necessary
         # this can cause bugs if the user changes the shape of the input
         self._adapt_shapes(x)
-        
+
         if self.training:
             # the docs claim the var is biased, but actually it is unbiased only in the forward pass
             # for the running var, the var is unbiased
             mean = x.mean(axis=self.axis, keepdims=True)
             var = ((x - mean) ** 2).mean(axis=self.axis, keepdims=True)
-            
+
             n = x.shape[0] * x.shape[2] if len(x.shape) == 3 else x.shape[0]
-            self.running_mean = Tensor((1 - self.momentum) * self.running_mean.data + self.momentum * mean.data , requires_grad=False)
-            self.running_var = Tensor((1 - self.momentum) * self.running_var.data + self.momentum * var.data * n / (n - 1), requires_grad=False)
+            self.running_mean = Tensor(
+                (1 - self.momentum) * self.running_mean.data
+                + self.momentum * mean.data,
+                requires_grad=False,
+            )
+            self.running_var = Tensor(
+                (1 - self.momentum) * self.running_var.data
+                + self.momentum * var.data * n / (n - 1),
+                requires_grad=False,
+            )
         else:
             mean = self.running_mean
             var = self.running_var
-            
+
         out = (x - mean) / (var + self.eps) ** 0.5
         out = self.gamma * out + self.beta
         return out
-    
+
     def _adapt_shapes(self, x: Tensor) -> None:
-        assert len(x.shape) == 2 or len(x.shape) == 3, "Expected 2D or 3D input (got {}D input)".format(len(x.shape))
-        
+        assert (
+            len(x.shape) == 2 or len(x.shape) == 3
+        ), "Expected 2D or 3D input (got {}D input)".format(len(x.shape))
+
         if len(self.gamma.shape) != len(x.shape) and not self.adapted:
             if len(x.shape) == 2:
                 self.gamma = self.gamma.reshape((1, self.num_features))
@@ -177,39 +211,109 @@ class BatchNorm1d(Module):
                 self.gamma = self.gamma.reshape((1, self.num_features, 1))
                 self.beta = self.beta.reshape((1, self.num_features, 1))
             self.adapted = True
-        
+
         if len(x.shape) == 2:
             self.axis = 0
         elif len(x.shape) == 3:
             self.axis = (0, 2)
-            
+
+
 class BatchNorm2d(Module):
-    def __init__(self, n_features: int, eps: float = 1e-5, momentum: float = 0.1) -> None:
+    def __init__(
+        self, n_features: int, eps: float = 1e-5, momentum: float = 0.1
+    ) -> None:
         super().__init__()
         self.n_features = n_features
         self.eps = eps
         self.momentum = momentum
-        
+
         self.gamma = Parameter(np.ones((1, n_features, 1, 1)))
         self.beta = Parameter(np.zeros((1, n_features, 1, 1)))
-        
+
         self.running_mean = Tensor(np.zeros((1, n_features, 1, 1)), requires_grad=False)
         self.running_var = Tensor(np.ones((1, n_features, 1, 1)), requires_grad=False)
-        
+
     def forward(self, x: Tensor) -> Tensor:
-        assert len(x.shape) == 4, "Input tensor must be (batch_size, num_features, height, width)"
+        assert (
+            len(x.shape) == 4
+        ), "Input tensor must be (batch_size, num_features, height, width)"
         axis = (0, 2, 3)
         if self.training:
             mean = x.mean(axis=axis, keepdims=True)
             var = ((x - mean) ** 2).mean(axis=axis, keepdims=True)
-            
+
             n = x.shape[0] * x.shape[2] * x.shape[3]
-            
-            self.running_mean = Tensor((1 - self.momentum) * self.running_mean.data + self.momentum * mean.data, requires_grad=False)
-            self.running_var = Tensor((1 - self.momentum) * self.running_var.data + self.momentum * var.data * n / (n - 1), requires_grad=False)
+
+            self.running_mean = Tensor(
+                (1 - self.momentum) * self.running_mean.data
+                + self.momentum * mean.data,
+                requires_grad=False,
+            )
+            self.running_var = Tensor(
+                (1 - self.momentum) * self.running_var.data
+                + self.momentum * var.data * n / (n - 1),
+                requires_grad=False,
+            )
         else:
             mean = self.running_mean
             var = self.running_var
         out = (x - mean) / (var + self.eps) ** 0.5
         out = self.gamma * out + self.beta
-        return out 
+        return out
+
+
+class RNN(Module):
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        num_layers: int,
+        nonlinearity: str,
+        bias: bool,
+        dropout: float = 0.0,
+    ) -> None:
+        assert (
+            input_size > 0
+            and hidden_size > 0
+            and num_layers > 0
+            and nonlinearity in ["relu", "tanh"]
+            and dropout >= 0.0
+            and dropout <= 1.0
+        )
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
+        self.dropout = dropout
+        self.activation = F.relu if nonlinearity == "relu" else F.tanh
+
+        for l in range(self.num_layers):
+            self.register_parameter(
+                f"weight_ih_l{l}",
+                Parameter(
+                    np.random.randn(hidden_size, input_size if l == 0 else hidden_size)
+                    / np.sqrt(hidden_size)
+                ),
+            )
+            self.register_parameter(
+                f"weight_hh_l{l}",
+                Parameter(
+                    np.random.randn(hidden_size, input_size if l == 0 else hidden_size)
+                    / np.sqrt(hidden_size)
+                ),
+            )
+            if self.bias:
+                self.register_parameter(
+                    f"bias_ih_l{l}",
+                    Parameter(np.random.randn(hidden_size)) / np.sqrt(hidden_size),
+                )
+                self.register_parameter(
+                    f"bias_hh_l{l}",
+                    Parameter(np.random.randn(hidden_size)) / np.sqrt(hidden_size),
+                )
+    def forward(self, x: Tensor) -> Tensor:
+        raise NotImplementedError
+        # assumes the batch size is the 2nd dimension, while time is the 0-th
+        batch_size = x.shape[1]
+        h = Tensor(np.zeros((self.num_layers, batch_size, self.hidden_size)), requires_grad=False)
+        # h_out = 

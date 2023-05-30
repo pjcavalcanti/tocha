@@ -277,28 +277,22 @@ def eq(t1: Tensor, t2: Tensor) -> bool:
     return False
 
 
-def concatenate(t1: Tensor, t2: Tensor, axis: int) -> Tensor:
-    data = np.concatenate([t1.data, t2.data], axis=axis)
-    requires_grad = t1.requires_grad or t2.requires_grad
+def concatenate(ts: List[Tensor], axis: int) -> Tensor:
+    data = np.concatenate([t.data for t in ts], axis=axis)
+    requires_grad = any([t.requires_grad for t in ts])
     depends_on = []
 
     if requires_grad:
-
-        def grad_fn1(grad: Tensor) -> Tensor:
-            s = [slice(None)] * t1.ndim
-            s[axis] = slice(0, t1.shape[axis])
-            s = tuple(s)
-            new_grad_data = grad.data[s]
-            return Tensor(new_grad_data)
-
-        def grad_fn2(grad: Tensor) -> Tensor:
-            s = [slice(None)] * t2.ndim
-            s[axis] = slice(t1.shape[axis], None)
-            s = tuple(s)
-            new_grad_data = grad.data[s]
-            return Tensor(new_grad_data)
-
-        depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
+        for t in ts:
+            def grad_fnt(grad: Tensor) -> Tensor:
+                shape = t.shape
+                
+                s = [slice(None)] * t.ndim
+                s[axis] = slice(0,shape[axis])
+                s = tuple(s)
+                new_grad_data = grad.data[s]
+                return Tensor(new_grad_data)
+            depends_on.append(Dependency(t, grad_fnt))
 
     return Tensor(data, requires_grad, depends_on)
 
