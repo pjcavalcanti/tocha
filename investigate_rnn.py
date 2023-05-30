@@ -1,6 +1,7 @@
 import torch
 # import torch.nn as nn
 import tocha
+from tocha.module import Parameter
 import tocha.nn as nn
 import numpy as np
 
@@ -79,7 +80,7 @@ dropout = 0
 bidirectional = False
 batch_first = True
 
-torch.manual_seed(3)
+torch.manual_seed(1)
 input_size = int(torch.randint(1, 10, size=()))
 hidden_size = int(torch.randint(1, 10, size=()))
 num_layers = int(torch.randint(1, 10, size=()))
@@ -87,9 +88,23 @@ B = int(torch.randint(1, 10, size=()))
 L = int(torch.randint(1, 10, size=()))
 
 rnn_man = nn.RNN(input_size, hidden_size, num_layers, nonlinearity, bias, dropout)
+rnn = torch.nn.RNN(
+    input_size=input_size,
+    hidden_size=hidden_size,
+    num_layers=num_layers,
+    nonlinearity=nonlinearity,
+    bias=bias,
+    dropout=dropout,
+    bidirectional=bidirectional,
+    batch_first=False,
+)
+for name, p in rnn.named_parameters():
+    setattr(rnn, name, )
 x_np = np.random.randn(L, B, input_size)
 x = tocha.tensor(x_np, requires_grad=True)
+x_torch = torch.tensor(x_np, requires_grad=True)
 out = rnn_man(x)
+print(out[0].shape, out[1].shape)
 
 
 
