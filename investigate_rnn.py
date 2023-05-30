@@ -1,6 +1,8 @@
 import torch
 # import torch.nn as nn
+import tocha
 import tocha.nn as nn
+import numpy as np
 
 
 class RNN_man(torch.nn.Module):
@@ -85,6 +87,10 @@ B = int(torch.randint(1, 10, size=()))
 L = int(torch.randint(1, 10, size=()))
 
 rnn_man = nn.RNN(input_size, hidden_size, num_layers, nonlinearity, bias, dropout)
+x_np = np.random.randn(L, B, input_size)
+x = tocha.tensor(x_np, requires_grad=True)
+out = rnn_man(x)
+
 
 
 # for _ in range(100):

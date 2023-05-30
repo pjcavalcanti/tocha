@@ -1,10 +1,11 @@
 import tocha
 import tocha.functional as F
 from tocha.module import Module, Parameter
-import numpy as np
-
-from typing import List, Tuple
 from autograd.tensor import Tensor, Arrayable, ensure_array
+
+import numpy as np
+from typing import List, Tuple
+import copy
 
 ## Non-linearities
 
@@ -284,7 +285,7 @@ class RNN(Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bias = bias
-        self.dropout = dropout
+        self.dropout = Dropout(p=dropout) if dropout > 0.0 else None
         self.activation = F.relu if nonlinearity == "relu" else F.tanh
 
         for l in range(self.num_layers):
@@ -311,9 +312,24 @@ class RNN(Module):
                     f"bias_hh_l{l}",
                     Parameter(np.random.randn(hidden_size)) / np.sqrt(hidden_size),
                 )
-    def forward(self, x: Tensor) -> Tensor:
-        raise NotImplementedError
-        # assumes the batch size is the 2nd dimension, while time is the 0-th
+    def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
+        # raise NotImplementedError
+        # # assumes the batch size is the 2nd dimension, while time is the 0-th
+        time_length = x.shape[0]
         batch_size = x.shape[1]
         h = Tensor(np.zeros((self.num_layers, batch_size, self.hidden_size)), requires_grad=False)
-        # h_out = 
+        h_out = []
+        for t in range(time_length):
+            for l in range(self.num_layers):
+                weights_ih = vars(self)[f'weight_ih_l{l}']
+                weights_hh = vars(self)[f'weight_hh_l{l}']
+                h[l] = x[t] @ weights_ih.transpose((1,0)) + h[l] @ weights_hh.transpose((1,0))
+                if self.bias:
+                    h[l] += vars(self)[f'bias_ih_l{l}'] + vars(self)[f'bias_hh_l{l}']
+                h[l] = self.activation(h[l])
+                if self.dropout is not None:
+                    h[l] = self.dropout(h[l])
+            h_out.append(copy.copy(h[-1:]))
+        h_out = tocha.concatenate(h_out, axis=0)
+        return (h_out, h_out[-1:], h)
+                

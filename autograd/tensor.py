@@ -84,6 +84,12 @@ class Tensor:
 
     def __getitem__(self, idx: Index) -> "Tensor":
         return getitem(self, idx)
+    
+    def __setitem__(self, idx: Index, value: Tensorable) -> "Tensor":
+        return setitem(self, idx, value)
+
+    def transpose(self, axes: Tuple[int, ...]) -> "Tensor":
+        return transpose(self, axes=axes)
 
     def reshape(self, shape: Tuple[int, ...]) -> "Tensor":
         return reshape(self, shape)
@@ -157,6 +163,13 @@ def getitem(t1: Tensor, idx: Index) -> Tensor:
 
     return Tensor(data, requires_grad, depends_on)
 
+def setitem(t1: Tensor, idx: Index, value: Tensorable) -> Tensor:
+    assert not t1.requires_grad, "Can only set values of tensors that don't require gradients"
+    data = t1.data
+    data[idx] = value.data if isinstance(value, Tensor) else ensure_array(value)
+    requires_grad = t1.requires_grad
+    depends_on = []
+    return Tensor(data, requires_grad, depends_on)
 
 def reshape(t1: Tensor, shape: Tuple[int, ...]) -> Tensor:
     data = np.reshape(t1.data, shape)
