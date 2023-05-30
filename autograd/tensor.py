@@ -64,9 +64,10 @@ class Tensor:
 
     # Function to compute gradients, recursively applying the chain rule
     def backward(self, grad: Optional["Tensor"] = None) -> None:
+        print("asdasdad")
         if not self.requires_grad:
             return
-        
+        print("123123123")
         if grad is None:
             # Assuming that we only start the backward pass on the scalar with respect to which we want to differentiate,
             if self.shape == ():
@@ -164,11 +165,21 @@ def getitem(t1: Tensor, idx: Index) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 def setitem(t1: Tensor, idx: Index, value: Tensorable) -> Tensor:
-    assert not t1.requires_grad, "Can only set values of tensors that don't require gradients"
-    data = t1.data
-    data[idx] = value.data if isinstance(value, Tensor) else ensure_array(value)
+    data = t1.data.copy()
+    value = value.data if isinstance(value, Tensor) else ensure_array(value)
+    data[idx] = value
     requires_grad = t1.requires_grad
     depends_on = []
+
+    if requires_grad:
+
+        def grad_fn(grad: Tensor) -> Tensor:
+            new_grad_data = np.zeros_like(t1.data)
+            new_grad_data[idx] = grad.data[idx]
+            return Tensor(new_grad_data)
+
+        depends_on.append(Dependency(t1, grad_fn))
+
     return Tensor(data, requires_grad, depends_on)
 
 def reshape(t1: Tensor, shape: Tuple[int, ...]) -> Tensor:

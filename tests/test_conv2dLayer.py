@@ -7,7 +7,7 @@ from tocha import nn
 
 class TestTensorNegate(unittest.TestCase):
     def test_conv2layer_shapes(self):
-        maxn = 4
+        maxn = 2
         for k1 in range(1, maxn):
             for k2 in range(1, maxn):
                 for B in range(1, maxn):

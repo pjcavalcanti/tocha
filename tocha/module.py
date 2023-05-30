@@ -1,4 +1,4 @@
-from typing import Any, List, Union
+from typing import Any, List, Union, Dict
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 
@@ -47,6 +47,15 @@ class Module:
                 params.append(var[1])
             if isinstance(var[1], Module):
                 params.extend(var[1].parameters())
+        return params
+    def named_parameters(self) -> Dict[str, Parameter]:
+        params = {}
+        for var in vars(self).items():
+            if isinstance(var[1], Parameter):
+                params[var[0]] = var[1]
+            if isinstance(var[1], Module):
+                for name, param in var[1].named_parameters().items():
+                    params[var[0] + "." + name] = param
         return params
 
     def children(self) -> List["Module"]:

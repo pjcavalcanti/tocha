@@ -272,6 +272,7 @@ class RNN(Module):
         nonlinearity: str,
         bias: bool,
         dropout: float = 0.0,
+        dtype: str = "float32",
     ) -> None:
         assert (
             input_size > 0
@@ -281,12 +282,14 @@ class RNN(Module):
             and dropout >= 0.0
             and dropout <= 1.0
         )
+        super().__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.bias = bias
         self.dropout = Dropout(p=dropout) if dropout > 0.0 else None
         self.activation = F.relu if nonlinearity == "relu" else F.tanh
+        self.dtype = np.float32 if dtype == "float32" else np.float64
 
         for l in range(self.num_layers):
             self.register_parameter(
@@ -299,8 +302,7 @@ class RNN(Module):
             self.register_parameter(
                 f"weight_hh_l{l}",
                 Parameter(
-                    np.random.randn(hidden_size, input_size if l == 0 else hidden_size)
-                    / np.sqrt(hidden_size)
+                    np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size)
                 ),
             )
             if self.bias:
@@ -312,24 +314,33 @@ class RNN(Module):
                     f"bias_hh_l{l}",
                     Parameter(np.random.randn(hidden_size)) / np.sqrt(hidden_size),
                 )
+
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
-        # raise NotImplementedError
         # # assumes the batch size is the 2nd dimension, while time is the 0-th
         time_length = x.shape[0]
         batch_size = x.shape[1]
-        h = Tensor(np.zeros((self.num_layers, batch_size, self.hidden_size)), requires_grad=False)
-        h_out = []
+        hidden_states = Tensor(
+            np.zeros((self.num_layers, batch_size, self.hidden_size), dtype=self.dtype),
+            requires_grad=True,
+        )
+        hidden_stastes_out = []
         for t in range(time_length):
+            hidden_states_temp = []
             for l in range(self.num_layers):
-                weights_ih = vars(self)[f'weight_ih_l{l}']
-                weights_hh = vars(self)[f'weight_hh_l{l}']
-                h[l] = x[t] @ weights_ih.transpose((1,0)) + h[l] @ weights_hh.transpose((1,0))
+                weights_ih = vars(self)[f"weight_ih_l{l}"]
+                weights_hh = vars(self)[f"weight_hh_l{l}"]
+                hidden_states[l] = (
+                    x[t] @ weights_ih.transpose((1, 0))
+                    + hidden_states[l] @ weights_hh.transpose((1, 0))
+                    if l == 0
+                    else hidden_states[l - 1] @ weights_ih.transpose((1, 0))
+                    + hidden_states[l] @ weights_hh.transpose((1, 0))
+                )
                 if self.bias:
-                    h[l] += vars(self)[f'bias_ih_l{l}'] + vars(self)[f'bias_hh_l{l}']
-                h[l] = self.activation(h[l])
-                if self.dropout is not None:
-                    h[l] = self.dropout(h[l])
-            h_out.append(copy.copy(h[-1:]))
-        h_out = tocha.concatenate(h_out, axis=0)
-        return (h_out, h_out[-1:], h)
-                
+                    hidden_states[l] += vars(self)[f"bias_ih_l{l}"] + vars(self)[f"bias_hh_l{l}"]
+                hidden_states[l] = self.activation(hidden_states[l])
+                if self.dropout is not None and self.training and l < self.num_layers - 1:
+                    hidden_states[l] = self.dropout(hidden_states[l])
+            hidden_stastes_out.append(copy.deepcopy(hidden_states[-1:]))
+        hidden_stastes_out = tocha.concatenate(hidden_stastes_out, axis=0)
+        return (hidden_stastes_out, hidden_states)
