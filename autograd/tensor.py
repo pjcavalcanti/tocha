@@ -40,6 +40,7 @@ class Tensor:
         requires_grad: bool = False,
         depends_on: Optional[List[Dependency]] = None,
         name: Optional[str] = None,
+        operation: Optional[str] = None,
     ) -> None:
         self.data = ensure_array(data)
         self.requires_grad = requires_grad
@@ -48,6 +49,10 @@ class Tensor:
             self.name = name
         else:
             self.name = None
+        if operation is not None:
+            self.operation = operation
+        else:
+            self.operation = None
 
         self.shape = self.data.shape
         self.ndim = self.data.ndim
@@ -64,10 +69,8 @@ class Tensor:
 
     # Function to compute gradients, recursively applying the chain rule
     def backward(self, grad: Optional["Tensor"] = None) -> None:
-        print("asdasdad")
         if not self.requires_grad:
             return
-        print("123123123")
         if grad is None:
             # Assuming that we only start the backward pass on the scalar with respect to which we want to differentiate,
             if self.shape == ():
@@ -79,8 +82,11 @@ class Tensor:
         if self.grad is not None:
             self.grad.data = self.grad.data + grad.data
 
+        # print(f"grad: {self.name, np.allclose(grad.data, 0)}")
         for dependency in self.depends_on:
             backward_grad = dependency.grad_fn(grad)
+            if np.allclose(backward_grad.data, 0):
+                print(f"grad close to zero: {self.operation, dependency.tensor.name}")
             dependency.tensor.backward(backward_grad)
 
     def __getitem__(self, idx: Index) -> "Tensor":
@@ -165,20 +171,21 @@ def getitem(t1: Tensor, idx: Index) -> Tensor:
     return Tensor(data, requires_grad, depends_on)
 
 def setitem(t1: Tensor, idx: Index, value: Tensorable) -> Tensor:
-    data = t1.data.copy()
+    assert not t1.requires_grad, "Can only set values of a tensor that doesn't require gradients"
+    data = t1.data
     value = value.data if isinstance(value, Tensor) else ensure_array(value)
     data[idx] = value
     requires_grad = t1.requires_grad
     depends_on = []
 
-    if requires_grad:
+    # if requires_grad:
 
-        def grad_fn(grad: Tensor) -> Tensor:
-            new_grad_data = np.zeros_like(t1.data)
-            new_grad_data[idx] = grad.data[idx]
-            return Tensor(new_grad_data)
+    #     def grad_fn(grad: Tensor) -> Tensor:
+    #         new_grad_data = np.zeros_like(t1.data)
+    #         new_grad_data[idx] = grad.data[idx]
+    #         return Tensor(new_grad_data)
 
-        depends_on.append(Dependency(t1, grad_fn))
+    #     depends_on.append(Dependency(t1, grad_fn))
 
     return Tensor(data, requires_grad, depends_on)
 
@@ -211,7 +218,7 @@ def transpose(t1: Tensor, axes: Tuple[int, ...]) -> Tensor:
 
         depends_on.append(Dependency(t1, grad_fn))
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, depends_on, operation="TRANSPOSE")
 
 
 def neg(t1: Tensor) -> Tensor:
@@ -318,7 +325,7 @@ def concatenate(ts: List[Tensor], axis: int) -> Tensor:
                 return Tensor(new_grad_data)
             depends_on.append(Dependency(t, grad_fnt))
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, depends_on, operation="CONCATENATE")
 
 
 def add(t1: Tensor, t2: Tensor) -> Tensor:
@@ -353,7 +360,7 @@ def add(t1: Tensor, t2: Tensor) -> Tensor:
 
         depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, depends_on, operation="ADD")
 
 
 def sub(t1: Tensor, t2: Tensor) -> Tensor:
@@ -458,7 +465,7 @@ def matmultensor(t1: Tensor, t2: Tensor) -> Tensor:
 
         depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
 
-    return Tensor(data, requires_grad, depends_on)
+    return Tensor(data, requires_grad, depends_on, operation="MATMUL")
 
 
 def ndot(t1: Tensor, t2: Tensor, n: int) -> Tensor:

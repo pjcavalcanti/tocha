@@ -1,12 +1,13 @@
-from typing import Any, List, Union, Dict
+from typing import Any, List, Union, Dict, Optional
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 
 class Parameter(Tensor):
-    def __init__(self, data: Union[Arrayable, Tensor]):
+    def __init__(self, data: Union[Arrayable, Tensor], name: Optional[str] = None):
         super().__init__(
             data.data if isinstance(data, Tensor) else ensure_array(data),
             requires_grad=True,
+            name=name,
         )
 
 
@@ -38,6 +39,7 @@ class Module:
             param.zero_grad()
             
     def register_parameter(self, name: str, p: Parameter) -> None:
+        assert isinstance(p, Parameter)
         vars(self)[name] = p
 
     def parameters(self) -> List[Parameter]:

@@ -1,9 +1,11 @@
 import torch
+
 # import torch.nn as nn
 import tocha
 from tocha.module import Parameter
 import tocha.nn as nn
 import numpy as np
+from tqdm import tqdm
 
 
 # class RNN_man(torch.nn.Module):
@@ -74,7 +76,6 @@ import numpy as np
 #         return (torch.concatenate(h_out, dim=0), h)
 
 
-
 # np.random.seed(1)
 # for _ in range(100):
 #     nonlinearity = "relu"
@@ -92,7 +93,7 @@ import numpy as np
 #     x_np = np.random.randn(L, B, input_size).astype(np.float32)
 #     x = tocha.tensor(x_np, requires_grad=True)
 #     x_torch = torch.tensor(x_np, requires_grad=True)
-    
+
 #     rnn_man = nn.RNN(input_size, hidden_size, num_layers, nonlinearity, bias, dropout)
 #     rnn = torch.nn.RNN(
 #         input_size=input_size,
@@ -119,20 +120,30 @@ import numpy as np
 #             f"fail out[1] with input_size={input_size}, hidden_size={hidden_size}, num_layers={num_layers}, nonlinearity={nonlinearity}, bias={str(bias)}, batch_size={B}, sequence_length={L}"
 #         )
 
-np.random.seed(1)
-for _ in range(100):
+np.random.seed(2)
+for _ in range(10):
     nonlinearity = str(np.random.choice(["relu", "tanh"]))
     bias = bool(np.random.choice([True, False]))
     dropout = 0
     bidirectional = False
     batch_first = True
 
-    input_size = np.random.randint(1, 10)
-    hidden_size = np.random.randint(1, 10)
-    num_layers = np.random.randint(2, 10)
-    B = np.random.randint(1, 10)
-    L = np.random.randint(1, 10)
-    
+    input_size = np.random.randint(2, 4)
+    hidden_size = np.random.randint(2, 4)
+    num_layers = np.random.randint(2, 4)
+    B = np.random.randint(1, 4)
+    L = np.random.randint(1, 4)
+
+    # print all the parameters for debugging
+    # one per line
+    # print(f"input_size={input_size}")
+    # print(f"hidden_size={hidden_size}")
+    # print(f"nonlinearity={nonlinearity}")
+    # print(f"bias={str(bias)}")
+    # print(f"num_layers={num_layers}")
+    # print(f"batch_size={B}")
+    # print(f"sequence_length={L}")
+
     x_np = np.random.randn(L, B, input_size).astype(np.float32)
     x = tocha.tensor(x_np, requires_grad=True)
     x_torch = torch.tensor(x_np, requires_grad=True)
@@ -149,10 +160,12 @@ for _ in range(100):
         batch_first=False,
     )
     for name, p in rnn.named_parameters():
-        setattr(rnn_man, name, p.detach().numpy())
+        setattr(rnn_man, name, Parameter(p.detach().numpy(), name=name))
 
     out = rnn_man(x)
     out_torch = rnn(x_torch)
+    
+    # print(np.allclose(out[0].data, out_torch[0].detach().numpy(), atol=1e-7))
 
     grad_np = np.random.randn(*out[0].shape).astype(np.float64)
     grad = tocha.tensor(grad_np, requires_grad=False)
@@ -161,5 +174,13 @@ for _ in range(100):
     out[0].backward(grad)
     out_torch[0].backward(grad_torch)
 
-    # print(np.allclose(x.grad.data, x_torch.grad.detach().numpy()), np.allclose(x.grad.data, np.zeros_like(x.grad.data)))
-    # print(np.allclose(x.grad.data, x_torch.grad.detach().numpy())  or np.allclose(x.grad.data, np.zeros_like(x.grad.data)))
+    print(
+        np.allclose(x.grad.data, x_torch.grad.detach().numpy(), atol=1e-4),
+        np.allclose(x.grad.data, np.zeros_like(x.grad.data), atol=1e-4),
+        np.allclose(x_torch.grad.detach().numpy(), np.zeros_like(x.grad.data), atol=1e-4),
+    )
+    # print(
+    #     np.allclose(x.grad.data, x_torch.grad.detach().numpy(), atol=1e-4)
+    #     and np.allclose(x.grad.data, np.zeros_like(x.grad.data), atol=1e-4)
+    # )
+    break
