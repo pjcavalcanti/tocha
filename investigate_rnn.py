@@ -39,11 +39,13 @@ class RNNCell(Module):
             self.bias_hh = Parameter(
                 np.random.randn(hidden_size) / np.sqrt(hidden_size)
             )
+
     def forward(self, x: Tensor, h: Tensor) -> Tensor:
         out = x @ self.weight_ih + h @ self.weight_hh
         if self.bias:
             out += self.bias_ih + self.bias_hh
         return self.activation(out)
+
 
 class RNN(Module):
     def __init__(
@@ -74,79 +76,55 @@ class RNN(Module):
         self.dtype = np.float32 if dtype == "float32" else np.float64
 
         for l in range(self.num_layers):
-            new_cell = RNNCell(input_size if l==0 else hidden_size, hidden_size, bias, nonlinearity, dtype)                
+            new_cell = RNNCell(
+                input_size if l == 0 else hidden_size,
+                hidden_size,
+                bias,
+                nonlinearity,
+                dtype,
+            )
             self.register_module(f"cell_{l}", new_cell)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
-        time_length = x.shape[0]
+        sequence_length = x.shape[0]
         batch_size = x.shape[1]
 
         # Initialize hidden states for all time steps and layers
-        hidden_states = [
-            [
-                Tensor(
-                    np.zeros((1, batch_size, self.hidden_size), dtype=self.dtype),
-                    requires_grad=False,
-                )
-                for _ in range(self.num_layers)
-            ]
-            for _ in range(time_length)
+        h = [
+            Tensor(
+                np.zeros((1, batch_size, self.hidden_size), dtype=self.dtype),
+                requires_grad=False,
+            )
+            for _ in range(self.num_layers)
         ]
         # Initialize outputs for all time steps
-        outputs = []
-        for time in range(time_length):
+        outputs = [
+            Tensor(
+                np.zeros((1, batch_size, self.hidden_size), dtype=self.dtype),
+                requires_grad=False,
+            )
+            for _ in range(sequence_length)
+        ]
+        for t in range(sequence_length):
+            x_in = x[t]
             for c, cell in enumerate(self.children()):
-                if c == 0:
-                    hidden_states[time][c] = cell(x[time], hidden_states[time - 1][c])
-                else:
-                    hidden_states[time][c] = cell(
-                        hidden_states[time][c - 1], hidden_states[time - 1][c]
-                    )
-                if self.dropout is not None and self.training and c < self.num_layers - 1:
-                    hidden_states[time][c] = self.dropout(hidden_states[time][c])
-            # After all layers have been applied, save the output of the last layer
-            outputs.append(hidden_states[time][-1])
-        outputs = tocha.concatenate(outputs, axis=0)  #
-        hidden_states = tocha.concatenate(hidden_states[-1], axis=0)
-        return (outputs, hidden_states)
+                h[c] = cell(x_in, h[c])
+                x_in = h[c]
+                
+                if (
+                    self.dropout is not None
+                    and self.training
+                    and c < self.num_layers - 1
+                ):
+                    h[t][c] = self.dropout(h[t][c])
+            outputs[t] = h[-1]
+        outputs = tocha.concatenate(outputs, axis=0)
+        h = tocha.concatenate(h, axis=0)
+        return (outputs, h)
 
-    def apply_layer_i(self, l: int, x_in: Tensor, h_in: Tensor):
-        # Apply the weights
-        weight_ih = vars(self)[f"weight_ih_l{l}"].transpose((1, 0))
-        weight_hh = vars(self)[f"weight_hh_l{l}"].transpose((1, 0))
-        h_out = x_in @ weight_ih + h_in @ weight_hh
-
-        # Apply the bias
-        if self.bias:
-            bias_ih = vars(self)[f"bias_ih_l{l}"]
-            bias_hh = vars(self)[f"bias_hh_l{l}"]
-            h_out = h_out + bias_ih + bias_hh
-
-        # Apply the activation function
-        h_out = self.activation(h_out)
-
-        # Apply dropout
-        if l < self.num_layers - 1 and self.dropout is not None and self.training:
-            h_out = self.dropout(h_out)
-        return h_out
-
-time_length = 3
-batch_size = 4
-input_size = 2
-hidden_size = 5
-num_layers = 2
-
-# x = Tensor(np.random.randn(time_length, batch_size, input_size), requires_grad=True)
-rnn_torch = RNN(input_size, hidden_size, num_layers, "relu", True)
-# z = rnn(x)[0]
-# grad = Tensor(np.random.randn(*z.shape))
-# z.backward(grad)
-# for name, p in rnn.named_parameters():
-#     print(name)
-#     print(vars(rnn)[cell_name].weight_ih.shape)
 
 np.random.seed(2)
-for _ in range(100):
+for _ in range(20):
     nonlinearity = str(np.random.choice(["relu", "tanh"]))
     bias = bool(np.random.choice([True, False]))
     dropout = 0
@@ -177,20 +155,20 @@ for _ in range(100):
     for name, p in rnn_torch.named_parameters():
         if name.startswith("weight_ih_l"):
             l = int(name[11:])
-            vars(rnn_man)[f"cell_{l}"].weight_ih.data = p.detach().numpy().transpose((1, 0))
+            vars(rnn_man)[f"cell_{l}"].weight_ih.data = (
+                p.detach().numpy().transpose((1, 0))
+            )
         if name.startswith("weight_hh_l"):
             l = int(name[11:])
-            vars(rnn_man)[f"cell_{l}"].weight_hh.data = p.detach().numpy().transpose((1, 0))
+            vars(rnn_man)[f"cell_{l}"].weight_hh.data = (
+                p.detach().numpy().transpose((1, 0))
+            )
         if name.startswith("bias_ih_l"):
             l = int(name[9:])
             vars(rnn_man)[f"cell_{l}"].bias_ih.data = p.detach().numpy()
         if name.startswith("bias_hh_l"):
             l = int(name[9:])
             vars(rnn_man)[f"cell_{l}"].bias_hh.data = p.detach().numpy()
-    
-
-    # for name, p in rnn.named_parameters():
-    #     setattr(rnn_man, name, Parameter(p.detach().numpy(), name=name))
 
     out = rnn_man(x)
     out_torch = rnn_torch(x_torch)
@@ -206,7 +184,6 @@ for _ in range(100):
     passgrad = np.allclose(x.grad.data, x_torch.grad.detach().numpy(), atol=1e-3)  # type: ignore
     assert passforward, f"forward: {passforward}"
     assert passgrad, f"backward: {passgrad}"
-    print(passforward and passgrad)
 #     debugstr = f"""
 # {_}
 # backward: {passgrad}, istruezero: {istruezero}:

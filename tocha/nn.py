@@ -262,6 +262,7 @@ class BatchNorm2d(Module):
         out = self.gamma * out + self.beta
         return out
 
+
 class RNNCell(Module):
     def __init__(
         self,
@@ -290,11 +291,13 @@ class RNNCell(Module):
             self.bias_hh = Parameter(
                 np.random.randn(hidden_size) / np.sqrt(hidden_size)
             )
+
     def forward(self, x: Tensor, h: Tensor) -> Tensor:
         out = x @ self.weight_ih + h @ self.weight_hh
         if self.bias:
             out += self.bias_ih + self.bias_hh
         return self.activation(out)
+
 
 class RNN(Module):
     def __init__(
@@ -325,45 +328,51 @@ class RNN(Module):
         self.dtype = np.float32 if dtype == "float32" else np.float64
 
         for l in range(self.num_layers):
-            new_cell = RNNCell(input_size if l==0 else hidden_size, hidden_size, bias, nonlinearity, dtype)                
+            new_cell = RNNCell(
+                input_size if l == 0 else hidden_size,
+                hidden_size,
+                bias,
+                nonlinearity,
+                dtype,
+            )
             self.register_module(f"cell_{l}", new_cell)
 
     def forward(self, x: Tensor) -> Tuple[Tensor, Tensor]:
-        time_length = x.shape[0]
+        sequence_length = x.shape[0]
         batch_size = x.shape[1]
 
         # Initialize hidden states for all time steps and layers
-        hidden_states = [
-            [
-                Tensor(
-                    np.zeros((1, batch_size, self.hidden_size), dtype=self.dtype),
-                    requires_grad=False,
-                )
-                for _ in range(self.num_layers)
-            ]
-            for _ in range(time_length)
+        h = [
+            Tensor(
+                np.zeros((1, batch_size, self.hidden_size), dtype=self.dtype),
+                requires_grad=False,
+            )
+            for _ in range(self.num_layers)
         ]
         # Initialize outputs for all time steps
-        outputs = []
-        for time in range(time_length):
+        outputs = [
+            Tensor(
+                np.zeros((1, batch_size, self.hidden_size), dtype=self.dtype),
+                requires_grad=False,
+            )
+            for _ in range(sequence_length)
+        ]
+        for t in range(sequence_length):
+            x_in = x[t]
             for c, cell in enumerate(self.children()):
-                if c == 0:
-                    hidden_states[time][c] = cell(x[time], hidden_states[time - 1][c])
-                else:
-                    hidden_states[time][c] = cell(
-                        hidden_states[time][c - 1], hidden_states[time - 1][c]
-                    )
-                if self.dropout is not None and self.training and c < self.num_layers - 1:
-                    hidden_states[time][c] = self.dropout(hidden_states[time][c])
-            # After all layers have been applied, save the output of the last layer
-            outputs.append(hidden_states[time][-1])
-        outputs = tocha.concatenate(outputs, axis=0)  #
-        hidden_states = tocha.concatenate(hidden_states[-1], axis=0)
-        return (outputs, hidden_states)
+                h[c] = cell(x_in, h[c])
+                x_in = h[c]
 
-
-
-
+                if (
+                    self.dropout is not None
+                    and self.training
+                    and c < self.num_layers - 1
+                ):
+                    h[t][c] = self.dropout(h[t][c])
+            outputs[t] = h[-1]
+        outputs = tocha.concatenate(outputs, axis=0)
+        h = tocha.concatenate(h, axis=0)
+        return (outputs, h)
 
 
 # class RNN(Module):
@@ -457,7 +466,7 @@ class RNN(Module):
 #                     )
 #             # After all layers have been applied, save the output of the last layer
 #             outputs.append(hidden_states[time][-1])
-#         outputs = tocha.concatenate(outputs, axis=0) # 
+#         outputs = tocha.concatenate(outputs, axis=0) #
 #         hidden_states = tocha.concatenate(hidden_states[-1], axis=0)
 #         return (outputs, hidden_states)
 
