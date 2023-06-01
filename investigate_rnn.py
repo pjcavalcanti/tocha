@@ -121,30 +121,20 @@ from tqdm import tqdm
 #         )
 
 np.random.seed(2)
-for _ in range(10):
+for _ in range(100):
     nonlinearity = str(np.random.choice(["relu", "tanh"]))
     bias = bool(np.random.choice([True, False]))
     dropout = 0
     bidirectional = False
     batch_first = True
 
-    input_size = np.random.randint(2, 4)
-    hidden_size = np.random.randint(2, 4)
-    num_layers = np.random.randint(2, 4)
-    B = np.random.randint(1, 4)
-    L = np.random.randint(1, 4)
+    input_size = np.random.randint(1, 6)
+    hidden_size = np.random.randint(1, 6)
+    num_layers = np.random.randint(1, 6)
+    batch_size = np.random.randint(1, 6)
+    sequence_length = np.random.randint(1, 6)
 
-    # print all the parameters for debugging
-    # one per line
-    # print(f"input_size={input_size}")
-    # print(f"hidden_size={hidden_size}")
-    # print(f"nonlinearity={nonlinearity}")
-    # print(f"bias={str(bias)}")
-    # print(f"num_layers={num_layers}")
-    # print(f"batch_size={B}")
-    # print(f"sequence_length={L}")
-
-    x_np = np.random.randn(L, B, input_size).astype(np.float32)
+    x_np = np.random.randn(sequence_length, batch_size, input_size).astype(np.float32)
     x = tocha.tensor(x_np, requires_grad=True)
     x_torch = torch.tensor(x_np, requires_grad=True)
 
@@ -164,23 +154,40 @@ for _ in range(10):
 
     out = rnn_man(x)
     out_torch = rnn(x_torch)
-    
+
     # print(np.allclose(out[0].data, out_torch[0].detach().numpy(), atol=1e-7))
 
-    grad_np = np.random.randn(*out[0].shape).astype(np.float64)
+    grad_np = np.random.randn(*out[0].shape).astype(np.float32) # type: ignore
     grad = tocha.tensor(grad_np, requires_grad=False)
     grad_torch = torch.tensor(grad_np, requires_grad=False)
 
     out[0].backward(grad)
     out_torch[0].backward(grad_torch)
 
-    print(
-        np.allclose(x.grad.data, x_torch.grad.detach().numpy(), atol=1e-4),
-        np.allclose(x.grad.data, np.zeros_like(x.grad.data), atol=1e-4),
-        np.allclose(x_torch.grad.detach().numpy(), np.zeros_like(x.grad.data), atol=1e-4),
+    passforward = np.allclose(out[0].data, out_torch[0].detach().numpy(), atol=1e-4)
+    passgrad = np.allclose(x.grad.data, x_torch.grad.detach().numpy(), atol=1e-3) # type: ignore
+    iszero = np.allclose(x.grad.data, np.zeros_like(x.grad.data), atol=1e-3) # type: ignore
+    istruezero = np.allclose(
+        x_torch.grad.detach().numpy(), # type: ignore
+        np.zeros_like(x_torch.grad.detach().numpy()), # type: ignore
+        atol=1e-3,
     )
-    # print(
-    #     np.allclose(x.grad.data, x_torch.grad.detach().numpy(), atol=1e-4)
-    #     and np.allclose(x.grad.data, np.zeros_like(x.grad.data), atol=1e-4)
+    # error = (
+    #     np.abs(x.grad.data - x_torch.grad.detach().numpy()).max()
+    #     / np.abs(x_torch.grad.detach().numpy()).max()
     # )
-    break
+    
+    debugstr = f"""
+{_} 
+backward: {passgrad}, istruezero: {istruezero}:
+            \tinput_size={input_size}
+            \thidden_size={hidden_size}
+            \tnonlinearity={nonlinearity}
+            \tbias={str(bias)}
+            \tnum_layers={num_layers}
+            \tbatch_size={batch_size}
+            \tsequence_length={sequence_length}
+"""
+    # if not passgrad:
+    #     print(debugstr)
+    print(passforward and passgrad)
