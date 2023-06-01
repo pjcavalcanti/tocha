@@ -85,13 +85,11 @@ class Tensor:
         # print(f"grad: {self.name, np.allclose(grad.data, 0)}")
         for dependency in self.depends_on:
             backward_grad = dependency.grad_fn(grad)
-            if np.allclose(backward_grad.data, 0):
-                print(f"grad close to zero: {self.operation, dependency.tensor.name}")
             dependency.tensor.backward(backward_grad)
 
     def __getitem__(self, idx: Index) -> "Tensor":
         return getitem(self, idx)
-    
+
     def __setitem__(self, idx: Index, value: Tensorable) -> "Tensor":
         return setitem(self, idx, value)
 
@@ -110,7 +108,7 @@ class Tensor:
         self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
     ) -> "Tensor":
         return mean(self, axis, keepdims)
-    
+
     def __pow__(self, other: Union[float, int]) -> "Tensor":
         return pow(self, other)
 
@@ -148,10 +146,10 @@ class Tensor:
         return mul(self, ensure_tensor(other))
 
     def __matmul__(self, other: Tensorable) -> "Tensor":
-        return matmultensor(self, ensure_tensor(other))
+        return matmul(self, ensure_tensor(other))
 
     def __rmatmul__(self, other: Tensorable) -> "Tensor":
-        return matmultensor(ensure_tensor(other), self)  # not commutative
+        return matmul(ensure_tensor(other), self)  # not commutative
 
 
 def getitem(t1: Tensor, idx: Index) -> Tensor:
@@ -170,8 +168,11 @@ def getitem(t1: Tensor, idx: Index) -> Tensor:
 
     return Tensor(data, requires_grad, depends_on)
 
+
 def setitem(t1: Tensor, idx: Index, value: Tensorable) -> Tensor:
-    assert not t1.requires_grad, "Can only set values of a tensor that doesn't require gradients"
+    assert (
+        not t1.requires_grad
+    ), "Can only set values of a tensor that doesn't require gradients"
     data = t1.data
     value = value.data if isinstance(value, Tensor) else ensure_array(value)
     data[idx] = value
@@ -188,6 +189,7 @@ def setitem(t1: Tensor, idx: Index, value: Tensorable) -> Tensor:
     #     depends_on.append(Dependency(t1, grad_fn))
 
     return Tensor(data, requires_grad, depends_on)
+
 
 def reshape(t1: Tensor, shape: Tuple[int, ...]) -> Tensor:
     data = np.reshape(t1.data, shape)
@@ -286,21 +288,26 @@ def mean(
         size = np.prod(np.array(t.shape))
     else:
         size = np.prod(np.array(t.shape)[np.array(axis)])
-    return t.sum(axis=axis, keepdims=keepdims) / size # type: ignore
+    return t.sum(axis=axis, keepdims=keepdims) / size  # type: ignore
+
 
 def pow(t: Tensor, exponent: Union[float, int]) -> Tensor:
     data = np.power(t.data, exponent)
     requires_grad = t.requires_grad
     depends_on = []
-    
+
     if requires_grad:
+
         def grad_fn(grad: Tensor):
-            new_grad_data = exponent * np.multiply(grad.data, np.power(t.data, exponent - 1))
+            new_grad_data = exponent * np.multiply(
+                grad.data, np.power(t.data, exponent - 1)
+            )
             return Tensor(new_grad_data)
-    
+
         depends_on.append(Dependency(t, grad_fn))
-    
+
     return Tensor(data, requires_grad, depends_on)
+
 
 def eq(t1: Tensor, t2: Tensor) -> bool:
     if t1.shape == t2.shape and t1.data.tolist() == t2.data.tolist():
@@ -315,14 +322,16 @@ def concatenate(ts: List[Tensor], axis: int) -> Tensor:
 
     if requires_grad:
         for t in ts:
+
             def grad_fnt(grad: Tensor) -> Tensor:
                 shape = t.shape
-                
+
                 s = [slice(None)] * t.ndim
-                s[axis] = slice(0,shape[axis])
+                s[axis] = slice(0, shape[axis])
                 s = tuple(s)
                 new_grad_data = grad.data[s]
                 return Tensor(new_grad_data)
+
             depends_on.append(Dependency(t, grad_fnt))
 
     return Tensor(data, requires_grad, depends_on, operation="CONCATENATE")
@@ -442,30 +451,95 @@ def divide(t1: Tensor, t2: Tensor) -> Tensor:
     return mul(t1, inv(t2))
 
 
-def matmultensor(t1: Tensor, t2: Tensor) -> Tensor:
-    data = np.tensordot(t1.data, t2.data, (t1.data.ndim - 1, 0))
+def matmul(t1: Tensor, t2: Tensor) -> Tensor:
+    data = np.matmul(t1.data, t2.data)
     requires_grad = t1.requires_grad or t2.requires_grad
     depends_on = []
 
     if requires_grad:
 
         def grad_fn1(grad: Tensor) -> Tensor:
-            n = t2.ndim - 1
-            new_grad_data = np.tensordot(
-                grad.data, t2.data, axes=(tuple(range(-n, 0)), tuple(range(-n, 0)))
-            )
+            if len(t1.shape) > 1 and len(t2.shape) > 1:
+                print("case 1")
+                print(f"grad shape: {grad.shape}")
+                print(f"t1.shape: {t1.shape}")
+                print(f"t2 shape: {t2.shape}")
+                added_dims = len(grad.shape) - len(t1.shape)
+                new_grad_data = np.matmul(grad.data, np.swapaxes(t2.data, -1, -2)).sum(
+                    axis=tuple(i for i in range(added_dims))
+                )
+                print(f"new grad shape: {new_grad_data.shape}")
+            elif len(t1.shape) > 1 and len(t2.shape) == 1:
+                print("case 2")
+                reshaped_grad_data = grad.data.reshape(*grad.data.shape, 1)
+                reshaped_t2_data = t2.data.reshape(
+                    *(1 for _ in range(len(grad.data.shape) - 1)), t2.data.shape[0]
+                )
+                new_grad_data = reshaped_grad_data * reshaped_t2_data
+            elif len(t1.shape) == 1 and len(t2.shape) > 1:
+                print("case 3")
+                axis_t1 = tuple(i for i in range(len(grad.shape)))
+                axis_t2 = tuple(i for i in range(len(t2.shape) - 2)) + (
+                    len(t2.shape) - 1,
+                )
+                new_grad_data = np.tensordot(
+                    grad.data, t2.data, axes=(axis_t1, axis_t2)
+                )
+            else:
+                new_grad_data = grad.data * t2.data
             return Tensor(new_grad_data)
 
         def grad_fn2(grad: Tensor) -> Tensor:
-            n = t1.ndim - 1
-            new_grad_data = np.tensordot(
-                t1.data, grad.data, axes=(tuple(range(0, n)), tuple(range(0, n)))
-            )
+            if len(t1.shape) > 1 and len(t2.shape) > 1:
+                added_dims = len(grad.shape) - len(t2.shape)
+                new_grad_data = np.matmul(np.swapaxes(t1.data, -1, -2), grad.data).sum(
+                    axis=tuple(i for i in range(added_dims))
+                )
+            elif len(t1.shape) > 1 and len(t2.shape) == 1:
+                grad_axis = tuple(i for i in range(len(grad.shape)))
+                t1_axis = tuple(i for i in range(len(t1.shape) - 1))
+                new_grad_data = np.tensordot(
+                    grad.data, t1.data, axes=(grad_axis, t1_axis)
+                )
+            elif len(t1.shape) == 1 and len(t2.shape) > 1:
+                reshaped_grad_data = grad.data.reshape(*grad.data.shape, 1)
+                reshaped_t1_data = t1.data.reshape(
+                    *(1 for _ in range(len(grad.data.shape) - 1)), t1.data.shape[0]
+                )
+                new_grad_data = np.swapaxes(
+                    reshaped_grad_data * reshaped_t1_data, -1, -2
+                )
+            else:
+                new_grad_data = grad.data * t1.data
             return Tensor(new_grad_data)
 
         depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
 
-    return Tensor(data, requires_grad, depends_on, operation="MATMUL")
+    return Tensor(data, requires_grad, depends_on)
+
+    # data = np.tensordot(t1.data, t2.data, (t1.data.ndim - 1, 0))
+    # requires_grad = t1.requires_grad or t2.requires_grad
+    # depends_on = []
+
+    # if requires_grad:
+
+    #     def grad_fn1(grad: Tensor) -> Tensor:
+    #         n = t2.ndim - 1
+    #         new_grad_data = np.tensordot(
+    #             grad.data, t2.data, axes=(tuple(range(-n, 0)), tuple(range(-n, 0)))
+    #         )
+    #         return Tensor(new_grad_data)
+
+    #     def grad_fn2(grad: Tensor) -> Tensor:
+    #         n = t1.ndim - 1
+    #         new_grad_data = np.tensordot(
+    #             t1.data, grad.data, axes=(tuple(range(0, n)), tuple(range(0, n)))
+    #         )
+    #         return Tensor(new_grad_data)
+
+    #     depends_on.extend([Dependency(t1, grad_fn1), Dependency(t2, grad_fn2)])
+
+    # return Tensor(data, requires_grad, depends_on, operation="MATMUL")
 
 
 def ndot(t1: Tensor, t2: Tensor, n: int) -> Tensor:
