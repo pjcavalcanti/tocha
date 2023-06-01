@@ -1,4 +1,4 @@
-from typing import Any, List, Union, Dict, Optional
+from typing import Any, Iterator, List, Tuple, Union, Dict, Optional
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 
@@ -9,6 +9,9 @@ class Parameter(Tensor):
             requires_grad=True,
             name=name,
         )
+        
+    def __repr__(self):
+        return f"Parameter({self.data}, requires_grad={self.requires_grad})"
 
 
 class Module:
@@ -41,31 +44,32 @@ class Module:
     def register_parameter(self, name: str, p: Parameter) -> None:
         assert isinstance(p, Parameter)
         vars(self)[name] = p
+    def register_module(self, name: str, module: "Module") -> None:
+        assert isinstance(module, Module)
+        vars(self)[name] = module
 
-    def parameters(self) -> List[Parameter]:
-        params = []
+    def parameters(self) -> Iterator[Parameter]:
         for var in vars(self).items():
             if isinstance(var[1], Parameter):
-                params.append(var[1])
+                yield var[1]
             if isinstance(var[1], Module):
-                params.extend(var[1].parameters())
-        return params
-    def named_parameters(self) -> Dict[str, Parameter]:
+                for param in var[1].parameters():
+                    yield param
+                yield from var[1].parameters()
+                
+    def named_parameters(self) -> Iterator[Tuple[str, Parameter]]:
         params = {}
         for var in vars(self).items():
             if isinstance(var[1], Parameter):
-                params[var[0]] = var[1]
+                yield var[0], var[1]
             if isinstance(var[1], Module):
-                for name, param in var[1].named_parameters().items():
-                    params[var[0] + "." + name] = param
-        return params
-
-    def children(self) -> List["Module"]:
-        child = []
+                for name, param in var[1].named_parameters():
+                    yield f"{var[0]}.{name}", param
+                    
+    def children(self) -> Iterator["Module"]:
         for var in vars(self).items():
             if isinstance(var[1], Module):
-                child.append(var[1])
-        return child
+                yield var[1]
 
 
 class ParameterList(Module):
