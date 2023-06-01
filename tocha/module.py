@@ -44,6 +44,7 @@ class Module:
     def register_parameter(self, name: str, p: Parameter) -> None:
         assert isinstance(p, Parameter)
         vars(self)[name] = p
+        
     def register_module(self, name: str, module: "Module") -> None:
         assert isinstance(module, Module)
         vars(self)[name] = module
@@ -70,6 +71,7 @@ class Module:
         for var in vars(self).items():
             if isinstance(var[1], Module):
                 yield var[1]
+            
 
 
 class ParameterList(Module):

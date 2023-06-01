@@ -4,7 +4,7 @@ from tocha.module import Module, Parameter
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 import numpy as np
-from typing import List, Tuple
+from typing import Iterator, List, Tuple
 import copy
 
 ## Non-linearities
@@ -361,18 +361,25 @@ class RNN(Module):
             x_in = x[t]
             for c, cell in enumerate(self.children()):
                 h[c] = cell(x_in, h[c])
-                x_in = h[c]
-
+                
                 if (
                     self.dropout is not None
                     and self.training
                     and c < self.num_layers - 1
                 ):
-                    h[t][c] = self.dropout(h[t][c])
+                    h[c] = self.dropout(h[c])
+                    
+                x_in = h[c]
             outputs[t] = h[-1]
         outputs = tocha.concatenate(outputs, axis=0)
         h = tocha.concatenate(h, axis=0)
         return (outputs, h)
+    
+    def children(self) -> Iterator[Module]:
+        for child in super().children():
+            if isinstance(child, Dropout):
+                continue
+            yield child
 
 
 # class RNN(Module):

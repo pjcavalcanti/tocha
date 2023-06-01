@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Iterator, Tuple
 import torch
 
 # import torch.nn as nn
@@ -108,22 +108,32 @@ class RNN(Module):
         for t in range(sequence_length):
             x_in = x[t]
             for c, cell in enumerate(self.children()):
+                print(type(cell))
                 h[c] = cell(x_in, h[c])
-                x_in = h[c]
                 
                 if (
                     self.dropout is not None
                     and self.training
                     and c < self.num_layers - 1
                 ):
-                    h[t][c] = self.dropout(h[t][c])
+                    h[c] = self.dropout(h[c])
+                    
+                x_in = h[c]
             outputs[t] = h[-1]
         outputs = tocha.concatenate(outputs, axis=0)
         h = tocha.concatenate(h, axis=0)
         return (outputs, h)
+    
+    def children(self) -> Iterator[Module]:
+        for child in super().children():
+            if isinstance(child, Dropout):
+                continue
+            yield child
+            
 
 
 np.random.seed(2)
+torch.manual_seed(2)
 for _ in range(20):
     nonlinearity = str(np.random.choice(["relu", "tanh"]))
     bias = bool(np.random.choice([True, False]))
