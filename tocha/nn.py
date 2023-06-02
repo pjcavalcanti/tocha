@@ -428,3 +428,53 @@ class LSTMCell(Module):
         cp = f * c + i * g
         hp = o * F.tanh(cp)
         return hp, cp
+    
+    
+class LSTM(Module):
+    def __init__(
+        self,
+        input_size: int,
+        hidden_size: int,
+        num_layers: int,
+        bias: bool = True,
+        dropout: float = 0.0,
+    ) -> None:
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
+        self.dropout = Dropout(p=dropout) if dropout > 0 else None
+        
+        for i in range(num_layers):
+            new_cell = LSTMCell(input_size if i == 0 else hidden_size, hidden_size, bias=bias)
+            self.register_module(f"cell{i}", new_cell)
+            
+    def forward(self, x: Tensor) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
+        seq_len = x.shape[0]
+        batch_size = x.shape[1]
+        
+        hs = [Tensor(np.zeros((1, batch_size, self.hidden_size))) for _ in range(self.num_layers)]
+        cs = [Tensor(np.zeros((1, batch_size, self.hidden_size))) for _ in range(self.num_layers)]
+        
+        x_outs = []
+        for t in range(seq_len):
+            x_in = x[t]
+            for l, cell in enumerate(self.children()):
+                h, c = cell(x_in, (hs[l], cs[l]))
+                hs[l] = h
+                cs[l] = c
+                if self.dropout is not None and l < self.num_layers - 1:
+                    h = self.dropout(h)
+                x_in = h
+            x_outs.append(h)
+        x_outs = tocha.concatenate(x_outs, axis=0)
+        hs = tocha.concatenate(hs, axis=0)
+        cs = tocha.concatenate(cs, axis=0)
+        return x_outs, (hs, cs)
+    
+    def children(self):
+        for child in super().children():
+            if isinstance(child, LSTMCell):
+                yield child
+            else:
+                continue
