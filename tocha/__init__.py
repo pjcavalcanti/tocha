@@ -1,3 +1,4 @@
 from autograd.tensor import Tensor as tensor
-from autograd.tensor import Tensor
-from autograd.tensor import tensordot, reshape, concatenate, transpose
+from autograd.tensor import Tensor, tensordot, reshape, concatenate, transpose, sum, mean, pow
+import tocha.functional
+import tocha.nn

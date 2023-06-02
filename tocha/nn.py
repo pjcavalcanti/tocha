@@ -381,3 +381,50 @@ class RNN(Module):
             if isinstance(child, Dropout):
                 continue
             yield child
+            
+class LSTMCell(Module):
+    def __init__(self, input_size: int, hidden_size: int, bias: bool = True) -> None:
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.input_size = input_size
+        self.bias = bias
+        
+        self.i_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
+        self.i_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
+        self.f_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
+        self.f_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
+        self.g_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
+        self.g_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
+        self.o_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
+        self.o_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
+        
+        if self.bias:
+            self.i_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.i_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.f_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.f_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.g_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.g_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.o_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            self.o_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
+            
+    def forward(self, x: Tensor, hc: Tuple[Tensor, Tensor]) -> Tensor:
+        h,c = hc
+        
+        pre_i = x @ self.i_weight_ih + h @ self.i_weight_hh
+        pre_f = x @ self.f_weight_ih + h @ self.f_weight_hh
+        pre_g = x @ self.g_weight_ih + h @ self.g_weight_hh
+        pre_o = x @ self.o_weight_ih + h @ self.o_weight_hh
+        if self.bias:
+            pre_i += self.i_bias_ih + self.i_bias_hh
+            pre_f += self.f_bias_ih + self.f_bias_hh
+            pre_g += self.g_bias_ih + self.g_bias_hh
+            pre_o += self.o_bias_ih + self.o_bias_hh        
+        i = F.sigmoid(pre_i)
+        f = F.sigmoid(pre_f)
+        g = F.tanh(pre_g)
+        o = F.sigmoid(pre_o)
+        
+        cp = f * c + i * g
+        hp = o * F.tanh(cp)
+        return hp, cp
