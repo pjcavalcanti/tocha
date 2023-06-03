@@ -108,6 +108,9 @@ class Tensor:
         self, axis: Optional[Union[int, Tuple[int, ...]]] = None, keepdims: bool = False
     ) -> "Tensor":
         return mean(self, axis, keepdims)
+    
+    def sqrt(self) -> "Tensor":
+        return self ** 0.5
 
     def __pow__(self, other: Union[float, int]) -> "Tensor":
         return pow(self, other)

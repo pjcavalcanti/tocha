@@ -1,5 +1,6 @@
 import unittest
 import tocha
+import tocha.nn
 import torch
 import numpy as np
 

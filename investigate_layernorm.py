@@ -1,34 +1,14 @@
-from typing import Tuple
+from typing import List, Tuple
 import torch
 import tocha
 from tocha import Tensor
 from tocha.module import Module, Parameter
 import numpy as np
 
-b, c, h = 2, 3, 4
-xnp = torch.randn(b, c, h)
-x = torch.tensor(xnp, requires_grad=True)
-normalized_shape = x.shape[1:]
-
-
-norm = torch.nn.LayerNorm(normalized_shape, eps=1e-05, elementwise_affine=True)
-for n, p in norm.named_parameters():
-    print(n, p.shape)
-out_torch = norm(x)
-
-    
-dims = tuple(len(x.shape) - i for i in range(len(normalized_shape), 0, -1))
-mean = x.mean(dims, keepdim=True)
-var = (x - mean).pow(2).mean(dims, keepdim=True)
-out_man = (x - mean) / torch.sqrt(var + norm.eps)
-out_man = out_man * norm.weight + norm.bias
-
-
 class LayerNorm(Module):
-    def __init__(self, normalized_shape: Tuple[int,...], eps: float=1e-5, elementwise_affine: bool=True):
+    def __init__(self, normalized_shape: List[int], eps: float=1e-5, elementwise_affine: bool=True):
         super().__init__()
         self.normalized_shape = normalized_shape
-        self.meandims = tuple(len(normalized_shape) - i for i in range(len(normalized_shape), 0, -1))
         self.eps = eps
         self.elementwise_affine = elementwise_affine
         
@@ -36,10 +16,48 @@ class LayerNorm(Module):
             self.weight = Parameter(np.ones(normalized_shape))
             self.bias = Parameter(np.zeros(normalized_shape))
             
-        def forward(self, x: Tensor) -> Tensor:
-            mean = x.mean(self.meandims, keepdims=True)
-            var = ((x - mean) ** 2).mean(self.meandims, keepdims=True)
-            out = (x - mean) / (var + self.eps).sqrt()
+    def forward(self, x: Tensor) -> Tensor:
+        dims = tuple(len(x.shape) - i for i in range(len(normalized_shape), 0, -1))
+        mean = x.mean(dims, keepdims=True)
+        var = ((x - mean) ** 2).mean(dims, keepdims=True)
+        out = (x - mean) / (var + self.eps).sqrt()
+        if self.elementwise_affine:
+            out = self.weight * out + self.bias
+        return out
 
-print(torch.allclose(out_man, out_torch, atol=1e-6))
 
+np.random.seed(0)
+for _ in range(100):
+    # prepare data
+    ndims = np.random.randint(2, 10)
+    shape = np.random.randint(1, 5, size=ndims)
+    eps = np.random.rand() * 10**(np.random.randint(-10, -1))
+    elementwise_affine = bool(np.random.choice([True, False]))
+    
+    xnp = np.random.randn(*shape).astype(np.float64) # type: ignore
+    normalized_shape = list(xnp.shape[1:])
+    x_tocha = tocha.tensor(xnp, requires_grad=True)
+    x_torch = torch.tensor(xnp, requires_grad=True)
+
+    # initialize and equate layers
+    norm_torch = torch.nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=elementwise_affine, dtype=torch.float64)
+    norm_tocha = LayerNorm(normalized_shape, eps=eps, elementwise_affine=elementwise_affine)
+    if elementwise_affine:
+        norm_tocha.weight.data = norm_torch.weight.detach().numpy()
+        norm_tocha.bias.data = norm_torch.bias.detach().numpy()
+    out_tocha = norm_tocha(x_tocha)
+    out_torch = norm_torch(x_torch)
+
+    # check forward and backward pass
+    passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-10)
+    assert passforward, 'forward pass failed'
+
+    gradnp = np.random.randn(*out_tocha.shape).astype(np.float64) # type: ignore
+    grad_tocha = tocha.tensor(gradnp)
+    grad_torch = torch.tensor(gradnp)
+
+    out_tocha.backward(grad_tocha)
+    out_torch.backward(grad_torch)
+
+    passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-10) # type: ignore
+    assert passbackward, 'backward pass failed'

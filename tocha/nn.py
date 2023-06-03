@@ -262,6 +262,28 @@ class BatchNorm2d(Module):
         out = self.gamma * out + self.beta
         return out
 
+class LayerNorm(Module):
+    def __init__(self, normalized_shape: List[int], eps: float=1e-5, elementwise_affine: bool=True):
+        super().__init__()
+        self.normalized_shape = normalized_shape
+        self.eps = eps
+        self.elementwise_affine = elementwise_affine
+        
+        if self.elementwise_affine:
+            self.weight = Parameter(np.ones(normalized_shape))
+            self.bias = Parameter(np.zeros(normalized_shape))
+            
+    def forward(self, x: Tensor) -> Tensor:
+        dims = tuple(len(x.shape) - i for i in range(len(self.normalized_shape), 0, -1))
+        mean = x.mean(dims, keepdims=True)
+        var = ((x - mean) ** 2).mean(dims, keepdims=True)
+        out = (x - mean) / (var + self.eps).sqrt()
+        if self.elementwise_affine:
+            out = self.weight * out + self.bias
+        return out
+
+
+## Recurrent Layers
 
 class RNNCell(Module):
     def __init__(
