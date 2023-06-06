@@ -31,8 +31,8 @@ class Module:
         for child in self.children():
             child.train()
     
-    def __call__(self, *args: Any) -> Any:
-        return self.forward(*args)
+    def __call__(self, *args: Any, **kwargs) -> Any:
+        return self.forward(*args, **kwargs)
 
     def forward(self, *args) -> Tensor:
         raise NotImplementedError

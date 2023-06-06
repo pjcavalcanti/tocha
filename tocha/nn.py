@@ -4,7 +4,7 @@ from tocha.module import Module, Parameter
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 import numpy as np
-from typing import Iterator, List, Tuple
+from typing import Iterator, List, Optional, Tuple
 import copy
 
 ## Non-linearities
@@ -500,3 +500,70 @@ class LSTM(Module):
                 yield child
             else:
                 continue
+            
+class ScaledDotProductAttentionHead(Module):
+    # Note the projection is absorbed here
+    def __init__(self, embed_dim: int, head_dim: int, bias: bool) -> None:
+        self.head_dim = head_dim
+        self.num_heads = embed_dim // head_dim
+        self.bias = bias
+        self.scale = np.sqrt(head_dim)
+
+        self.q_proj_weight = Parameter(np.random.randn(embed_dim, head_dim))
+        self.k_proj_weight = Parameter(np.random.randn(embed_dim, head_dim))
+        self.v_proj_weight = Parameter(np.random.randn(embed_dim, head_dim))
+
+        if self.bias:
+            self.q_proj_bias = Parameter(np.random.randn(head_dim))
+            self.k_proj_bias = Parameter(np.random.randn(head_dim))
+            self.v_proj_bias = Parameter(np.random.randn(head_dim))
+
+    def forward(self, q: Tensor, k: Tensor, v: Tensor, att_mask: Optional[Tensor] = None) -> Tensor:
+        # use attention formula from https://arxiv.org/pdf/1706.03762.pdf
+        Q = q @ self.q_proj_weight
+        K = k @ self.k_proj_weight
+        V = v @ self.v_proj_weight
+        if self.bias:
+            Q += self.q_proj_bias
+            K += self.k_proj_bias
+            V += self.v_proj_bias
+
+        att = Q @ K.transpose((0, 2, 1)) / self.scale
+        if att_mask is not None:
+            att = att_mask * att
+        att = F.softmax(Q @ K.transpose((0, 2, 1)) / self.scale, dim=-1) @ V
+        return att
+
+
+class MultiHeadAttention(Module):
+    # Assumes that the input has batch_first = True
+    def __init__(self, embed_dim: int, num_heads: int, bias: bool = True, dropout: float = 0.0):
+        super().__init__()
+        assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
+        assert dropout >= 0.0 and dropout <= 1.0, "dropout must be between 0.0 and 1.0"
+        
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.bias = bias
+
+        self.head_dim = embed_dim // num_heads
+
+        for i in range(num_heads):
+            new_head = ScaledDotProductAttentionHead(embed_dim, self.head_dim, bias)
+            self.register_module(f"head_{i}", new_head)
+        self.out_proj_weight = Parameter(np.random.randn(embed_dim, embed_dim))
+        if self.bias:
+            self.out_proj_bias = Parameter(np.random.randn(embed_dim))
+        
+        self.dropout = Dropout(dropout) if dropout > 0.0 else None
+
+    def forward(self, q: Tensor, k: Tensor, v: Tensor, attn_mask: Optional[Tensor] = None) -> Tensor:
+        # apply all heads
+        head_outputs = [getattr(self, f"head_{i}")(q, k, v, attn_mask) for i in range(self.num_heads)]
+        # concatenate head outputs, then project
+        output = tocha.concatenate(head_outputs, axis=-1) @ self.out_proj_weight
+        if self.bias:
+            output += self.out_proj_bias
+        if self.dropout is not None:
+            output = self.dropout(output)
+        return output
