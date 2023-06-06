@@ -8,6 +8,7 @@ import numpy as np
 class TestLSTMCell(unittest.TestCase):
     def test_rnn_against_torch_output_0(self):
         np.random.seed(0)
+        torch.manual_seed(0)
         for _ in range(5): # tested for 100 successfully before
             seq_len = int(np.random.randint(1, 4))
             batch_size = int(np.random.randint(1, 4))
