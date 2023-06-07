@@ -265,7 +265,7 @@ class BatchNorm2d(Module):
 class LayerNorm(Module):
     def __init__(self, normalized_shape: List[int], eps: float=1e-5, elementwise_affine: bool=True):
         super().__init__()
-        self.normalized_shape = normalized_shape
+        self.normalized_shape = normalized_shape # [The shape not including the batch dimension]
         self.eps = eps
         self.elementwise_affine = elementwise_affine
         
@@ -274,6 +274,7 @@ class LayerNorm(Module):
             self.bias = Parameter(np.zeros(normalized_shape))
             
     def forward(self, x: Tensor) -> Tensor:
+        print(x.shape, type(len(x.shape)))
         dims = tuple(len(x.shape) - i for i in range(len(self.normalized_shape), 0, -1))
         mean = x.mean(dims, keepdims=True)
         var = ((x - mean) ** 2).mean(dims, keepdims=True)
@@ -535,7 +536,7 @@ class ScaledDotProductAttentionHead(Module):
         return att
 
 
-class MultiHeadAttention(Module):
+class MultiheadAttention(Module):
     # Assumes that the input has batch_first = True
     def __init__(self, embed_dim: int, num_heads: int, bias: bool = True, dropout: float = 0.0):
         super().__init__()

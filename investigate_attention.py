@@ -204,6 +204,43 @@ class MultiHeadAttention(nn.Module):
         return output
 
 
+def equate_torch_to_tocha_attention(tor, toc, bias, num_heads):
+    qkv_weight = tor.in_proj_weight
+    out_weight = tor.out_proj.weight
+    if bias:
+        qkv_bias = tor.in_proj_bias
+        out_bias = tor.out_proj.bias
+
+    # separate q,k,v
+    q_weight, k_weight, v_weight = qkv_weight.chunk(3, dim=0)
+    if bias:
+        q_bias, k_bias, v_bias = qkv_bias.chunk(3, dim=0)
+
+    # separate head weights/biases
+    head_wq = q_weight.t().chunk(dim=1, chunks=num_heads)
+    head_wk = k_weight.t().chunk(dim=1, chunks=num_heads)
+    head_wv = v_weight.t().chunk(dim=1, chunks=num_heads)
+    if bias:
+        head_bq = q_bias.chunk(dim=0, chunks=num_heads)
+        head_bk = k_bias.chunk(dim=0, chunks=num_heads)
+        head_bv = v_bias.chunk(dim=0, chunks=num_heads)
+
+    for h, (wq, wk, wv) in enumerate(zip(head_wq, head_wk, head_wv)):
+        head = getattr(toc, f"head_{h}")
+        head.q_proj_weight.data = wq.detach().numpy()
+        head.k_proj_weight.data = wk.detach().numpy()
+        head.v_proj_weight.data = wv.detach().numpy()
+    if bias:
+        for h, (bq, bk, bv) in enumerate(zip(head_bq, head_bk, head_bv)):
+            head = getattr(toc, f"head_{h}")
+            head.q_proj_bias.data = bq.detach().numpy()
+            head.k_proj_bias.data = bk.detach().numpy()
+            head.v_proj_bias.data = bv.detach().numpy()
+    toc.out_proj_weight.data = out_weight.t().detach().numpy()
+    if bias:
+        toc.out_proj_bias.data = out_bias.detach().numpy()
+    
+
 for _ in range(100):
     np.random.seed(0)
     num_heads = np.random.randint(1, 5)
@@ -236,40 +273,41 @@ for _ in range(100):
     )
     attention_torch.eval()
 
-    qkv_weight = attention_torch.in_proj_weight
-    out_weight = attention_torch.out_proj.weight
-    if bias:
-        qkv_bias = attention_torch.in_proj_bias
-        out_bias = attention_torch.out_proj.bias
+    equate_torch_to_tocha_attention(attention_torch, attention_tocha, bias, num_heads)
+    # qkv_weight = attention_torch.in_proj_weight
+    # out_weight = attention_torch.out_proj.weight
+    # if bias:
+    #     qkv_bias = attention_torch.in_proj_bias
+    #     out_bias = attention_torch.out_proj.bias
 
-    # separate q,k,v
-    q_weight, k_weight, v_weight = qkv_weight.chunk(3, dim=0)
-    if bias:
-        q_bias, k_bias, v_bias = qkv_bias.chunk(3, dim=0)
+    # # separate q,k,v
+    # q_weight, k_weight, v_weight = qkv_weight.chunk(3, dim=0)
+    # if bias:
+    #     q_bias, k_bias, v_bias = qkv_bias.chunk(3, dim=0)
 
-    # separate head weights/biases
-    head_wq = q_weight.t().chunk(dim=1, chunks=num_heads)
-    head_wk = k_weight.t().chunk(dim=1, chunks=num_heads)
-    head_wv = v_weight.t().chunk(dim=1, chunks=num_heads)
-    if bias:
-        head_bq = q_bias.chunk(dim=0, chunks=num_heads)
-        head_bk = k_bias.chunk(dim=0, chunks=num_heads)
-        head_bv = v_bias.chunk(dim=0, chunks=num_heads)
+    # # separate head weights/biases
+    # head_wq = q_weight.t().chunk(dim=1, chunks=num_heads)
+    # head_wk = k_weight.t().chunk(dim=1, chunks=num_heads)
+    # head_wv = v_weight.t().chunk(dim=1, chunks=num_heads)
+    # if bias:
+    #     head_bq = q_bias.chunk(dim=0, chunks=num_heads)
+    #     head_bk = k_bias.chunk(dim=0, chunks=num_heads)
+    #     head_bv = v_bias.chunk(dim=0, chunks=num_heads)
 
-    for h, (wq, wk, wv) in enumerate(zip(head_wq, head_wk, head_wv)):
-        head = getattr(attention_tocha, f"head_{h}")
-        head.q_proj_weight.data = wq.detach().numpy()
-        head.k_proj_weight.data = wk.detach().numpy()
-        head.v_proj_weight.data = wv.detach().numpy()
-    if bias:
-        for h, (bq, bk, bv) in enumerate(zip(head_bq, head_bk, head_bv)):
-            head = getattr(attention_tocha, f"head_{h}")
-            head.q_proj_bias.data = bq.detach().numpy()
-            head.k_proj_bias.data = bk.detach().numpy()
-            head.v_proj_bias.data = bv.detach().numpy()
-    attention_tocha.out_proj_weight.data = out_weight.t().detach().numpy()
-    if bias:
-        attention_tocha.out_proj_bias.data = out_bias.detach().numpy()
+    # for h, (wq, wk, wv) in enumerate(zip(head_wq, head_wk, head_wv)):
+    #     head = getattr(attention_tocha, f"head_{h}")
+    #     head.q_proj_weight.data = wq.detach().numpy()
+    #     head.k_proj_weight.data = wk.detach().numpy()
+    #     head.v_proj_weight.data = wv.detach().numpy()
+    # if bias:
+    #     for h, (bq, bk, bv) in enumerate(zip(head_bq, head_bk, head_bv)):
+    #         head = getattr(attention_tocha, f"head_{h}")
+    #         head.q_proj_bias.data = bq.detach().numpy()
+    #         head.k_proj_bias.data = bk.detach().numpy()
+    #         head.v_proj_bias.data = bv.detach().numpy()
+    # attention_tocha.out_proj_weight.data = out_weight.t().detach().numpy()
+    # if bias:
+    #     attention_tocha.out_proj_bias.data = out_bias.detach().numpy()
 
     out_tocha = attention_tocha(q_tocha, k_tocha, v_tocha, attn_mask=mask_tocha)
     out_torch = attention_torch(q_torch, k_torch, v_torch, attn_mask=mask_torch)[0]

@@ -3,9 +3,9 @@ import numpy as np
 import torch
 
 import tocha
-from tocha.nn import MultiHeadAttention
+from tocha.nn import MultiheadAttention
 
-class TestMultiHeadAttention(unittest.TestCase):
+class TestMultiheadAttention(unittest.TestCase):
     def test_multiheadattention_against_torch(self):
         for _ in range(100):
             np.random.seed(0)
@@ -16,7 +16,6 @@ class TestMultiHeadAttention(unittest.TestCase):
             dropout = 0.0
             bias = bool(np.random.choice([True, False]))
 
-            xnp = np.random.randn(batch_size, seq_len, embed_dim).astype(np.float32)
             qnp = np.random.randn(batch_size, seq_len, embed_dim).astype(np.float32)
             knp = np.random.randn(batch_size, seq_len, embed_dim).astype(np.float32)
             vnp = np.random.randn(batch_size, seq_len, embed_dim).astype(np.float32)
@@ -33,7 +32,7 @@ class TestMultiHeadAttention(unittest.TestCase):
             mask_torch = torch.tensor(masknp, requires_grad=False)
 
             
-            attention_tocha = MultiHeadAttention(embed_dim, num_heads, bias=bias, dropout=dropout)
+            attention_tocha = MultiheadAttention(embed_dim, num_heads, bias=bias, dropout=dropout)
             attention_torch = torch.nn.MultiheadAttention(
                 embed_dim, num_heads, dropout, batch_first=True, bias=bias
             )
