@@ -4,7 +4,7 @@ from tocha.module import Module, Parameter
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 import numpy as np
-from typing import Iterator, List, Optional, Tuple
+from typing import Iterator, List, Optional, Tuple, Union
 import copy
 
 ## Non-linearities
@@ -262,17 +262,27 @@ class BatchNorm2d(Module):
         out = self.gamma * out + self.beta
         return out
 
+
 class LayerNorm(Module):
-    def __init__(self, normalized_shape: List[int], eps: float=1e-5, elementwise_affine: bool=True):
+    def __init__(
+        self,
+        normalized_shape: Union[List[int], int],
+        eps: float = 1e-5,
+        elementwise_affine: bool = True,
+    ):
         super().__init__()
-        self.normalized_shape = normalized_shape # [The shape not including the batch dimension]
+        self.normalized_shape = (
+            [normalized_shape]
+            if isinstance(normalized_shape, int)
+            else normalized_shape
+        )
         self.eps = eps
         self.elementwise_affine = elementwise_affine
-        
+
         if self.elementwise_affine:
-            self.weight = Parameter(np.ones(normalized_shape))
-            self.bias = Parameter(np.zeros(normalized_shape))
-            
+            self.weight = Parameter(np.ones(self.normalized_shape))
+            self.bias = Parameter(np.zeros(self.normalized_shape))
+
     def forward(self, x: Tensor) -> Tensor:
         print(x.shape, type(len(x.shape)))
         dims = tuple(len(x.shape) - i for i in range(len(self.normalized_shape), 0, -1))
@@ -285,6 +295,7 @@ class LayerNorm(Module):
 
 
 ## Recurrent Layers
+
 
 class RNNCell(Module):
     def __init__(
@@ -385,55 +396,88 @@ class RNN(Module):
             x_in = x[t]
             for c, cell in enumerate(self.children()):
                 h[c] = cell(x_in, h[c])
-                
+
                 if (
                     self.dropout is not None
                     and self.training
                     and c < self.num_layers - 1
                 ):
                     h[c] = self.dropout(h[c])
-                    
+
                 x_in = h[c]
             outputs[t] = h[-1]
         outputs = tocha.concatenate(outputs, axis=0)
         h = tocha.concatenate(h, axis=0)
         return (outputs, h)
-    
+
     def children(self) -> Iterator[Module]:
         for child in super().children():
             if isinstance(child, Dropout):
                 continue
             yield child
-            
+
+
 class LSTMCell(Module):
     def __init__(self, input_size: int, hidden_size: int, bias: bool = True) -> None:
         super().__init__()
         self.hidden_size = hidden_size
         self.input_size = input_size
         self.bias = bias
-        
-        self.i_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
-        self.i_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
-        self.f_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
-        self.f_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
-        self.g_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
-        self.g_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
-        self.o_weight_ih = Parameter(np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size))
-        self.o_weight_hh = Parameter(np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size))
-        
+
+        self.i_weight_ih = Parameter(
+            np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.i_weight_hh = Parameter(
+            np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.f_weight_ih = Parameter(
+            np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.f_weight_hh = Parameter(
+            np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.g_weight_ih = Parameter(
+            np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.g_weight_hh = Parameter(
+            np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.o_weight_ih = Parameter(
+            np.random.randn(input_size, hidden_size) / np.sqrt(hidden_size)
+        )
+        self.o_weight_hh = Parameter(
+            np.random.randn(hidden_size, hidden_size) / np.sqrt(hidden_size)
+        )
+
         if self.bias:
-            self.i_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.i_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.f_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.f_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.g_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.g_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.o_bias_ih = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            self.o_bias_hh = Parameter(np.random.randn(hidden_size) / np.sqrt(hidden_size))
-            
+            self.i_bias_ih = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.i_bias_hh = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.f_bias_ih = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.f_bias_hh = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.g_bias_ih = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.g_bias_hh = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.o_bias_ih = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+            self.o_bias_hh = Parameter(
+                np.random.randn(hidden_size) / np.sqrt(hidden_size)
+            )
+
     def forward(self, x: Tensor, hc: Tuple[Tensor, Tensor]) -> Tensor:
-        h,c = hc
-        
+        h, c = hc
+
         pre_i = x @ self.i_weight_ih + h @ self.i_weight_hh
         pre_f = x @ self.f_weight_ih + h @ self.f_weight_hh
         pre_g = x @ self.g_weight_ih + h @ self.g_weight_hh
@@ -442,17 +486,17 @@ class LSTMCell(Module):
             pre_i += self.i_bias_ih + self.i_bias_hh
             pre_f += self.f_bias_ih + self.f_bias_hh
             pre_g += self.g_bias_ih + self.g_bias_hh
-            pre_o += self.o_bias_ih + self.o_bias_hh        
+            pre_o += self.o_bias_ih + self.o_bias_hh
         i = F.sigmoid(pre_i)
         f = F.sigmoid(pre_f)
         g = F.tanh(pre_g)
         o = F.sigmoid(pre_o)
-        
+
         cp = f * c + i * g
         hp = o * F.tanh(cp)
         return hp, cp
-    
-    
+
+
 class LSTM(Module):
     def __init__(
         self,
@@ -467,18 +511,26 @@ class LSTM(Module):
         self.num_layers = num_layers
         self.bias = bias
         self.dropout = Dropout(p=dropout) if dropout > 0 else None
-        
+
         for i in range(num_layers):
-            new_cell = LSTMCell(input_size if i == 0 else hidden_size, hidden_size, bias=bias)
+            new_cell = LSTMCell(
+                input_size if i == 0 else hidden_size, hidden_size, bias=bias
+            )
             self.register_module(f"cell{i}", new_cell)
-            
+
     def forward(self, x: Tensor) -> Tuple[Tensor, Tuple[Tensor, Tensor]]:
         seq_len = x.shape[0]
         batch_size = x.shape[1]
-        
-        hs = [Tensor(np.zeros((1, batch_size, self.hidden_size))) for _ in range(self.num_layers)]
-        cs = [Tensor(np.zeros((1, batch_size, self.hidden_size))) for _ in range(self.num_layers)]
-        
+
+        hs = [
+            Tensor(np.zeros((1, batch_size, self.hidden_size)))
+            for _ in range(self.num_layers)
+        ]
+        cs = [
+            Tensor(np.zeros((1, batch_size, self.hidden_size)))
+            for _ in range(self.num_layers)
+        ]
+
         x_outs = []
         for t in range(seq_len):
             x_in = x[t]
@@ -494,14 +546,15 @@ class LSTM(Module):
         hs = tocha.concatenate(hs, axis=0)
         cs = tocha.concatenate(cs, axis=0)
         return x_outs, (hs, cs)
-    
+
     def children(self):
         for child in super().children():
             if isinstance(child, LSTMCell):
                 yield child
             else:
                 continue
-            
+
+
 class ScaledDotProductAttentionHead(Module):
     # Note the projection is absorbed here
     def __init__(self, embed_dim: int, head_dim: int, bias: bool) -> None:
@@ -519,7 +572,9 @@ class ScaledDotProductAttentionHead(Module):
             self.k_proj_bias = Parameter(np.random.randn(head_dim))
             self.v_proj_bias = Parameter(np.random.randn(head_dim))
 
-    def forward(self, q: Tensor, k: Tensor, v: Tensor, att_mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, q: Tensor, k: Tensor, v: Tensor, att_mask: Optional[Tensor] = None
+    ) -> Tensor:
         # use attention formula from https://arxiv.org/pdf/1706.03762.pdf
         Q = q @ self.q_proj_weight
         K = k @ self.k_proj_weight
@@ -538,11 +593,13 @@ class ScaledDotProductAttentionHead(Module):
 
 class MultiheadAttention(Module):
     # Assumes that the input has batch_first = True
-    def __init__(self, embed_dim: int, num_heads: int, bias: bool = True, dropout: float = 0.0):
+    def __init__(
+        self, embed_dim: int, num_heads: int, bias: bool = True, dropout: float = 0.0
+    ):
         super().__init__()
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
         assert dropout >= 0.0 and dropout <= 1.0, "dropout must be between 0.0 and 1.0"
-        
+
         self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.bias = bias
@@ -555,12 +612,17 @@ class MultiheadAttention(Module):
         self.out_proj_weight = Parameter(np.random.randn(embed_dim, embed_dim))
         if self.bias:
             self.out_proj_bias = Parameter(np.random.randn(embed_dim))
-        
+
         self.dropout = Dropout(dropout) if dropout > 0.0 else None
 
-    def forward(self, q: Tensor, k: Tensor, v: Tensor, attn_mask: Optional[Tensor] = None) -> Tensor:
+    def forward(
+        self, q: Tensor, k: Tensor, v: Tensor, attn_mask: Optional[Tensor] = None
+    ) -> Tensor:
         # apply all heads
-        head_outputs = [getattr(self, f"head_{i}")(q, k, v, attn_mask) for i in range(self.num_heads)]
+        head_outputs = [
+            getattr(self, f"head_{i}")(q, k, v, attn_mask)
+            for i in range(self.num_heads)
+        ]
         # concatenate head outputs, then project
         output = tocha.concatenate(head_outputs, axis=-1) @ self.out_proj_weight
         if self.bias:

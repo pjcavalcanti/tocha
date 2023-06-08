@@ -16,7 +16,10 @@ class LayerNormTest(unittest.TestCase):
             elementwise_affine = bool(np.random.choice([True, False]))
             
             xnp = np.random.randn(*shape).astype(np.float64) # type: ignore
-            normalized_shape = list(xnp.shape[1:])
+            i0 = np.random.randint(0, len(shape))
+            normalized_shape = list(xnp.shape[i0:])
+            if np.random.random() < 0.5:
+                normalized_shape = int(shape[-1])
             x_tocha = tocha.tensor(xnp, requires_grad=True)
             x_torch = torch.tensor(xnp, requires_grad=True)
 

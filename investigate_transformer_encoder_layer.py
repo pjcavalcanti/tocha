@@ -187,7 +187,7 @@ class TransformerEncoderLayer(Module):
         self.linear1 = Linear(d_model, dim_feedforwad)
         self.linear2 = Linear(dim_feedforwad, d_model)
         self.norm1 = LayerNorm((seq_len, d_model), eps=layer_norm_eps)
-        self.norm2 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = LayerNorm((seq_len, d_model), eps=layer_norm_eps)
         self.dropout = Dropout(dropout)
         self.dropout1 = Dropout(dropout)
         self.dropout2 = Dropout(dropout)
@@ -241,6 +241,17 @@ equate_torch_to_tocha_attention(enc_torch.self_attn, enc_tocha.self_attn, bias, 
 # enc_man.self_attn.out_proj.weight = enc_torch.self_attn.out_proj.weight
 # enc_man.self_attn.out_proj.bias = enc_torch.self_attn.out_proj.bias
 # equate_torch_to_tocha_attention(enc_man.self_attn, enc_torch.self_attn, bias, nhead)
+
+# COMPARE SHAPES:
+print(f"{enc_tocha.linear1.weights.shape == enc_torch.linear1.weight.T.shape}")
+print(f"{enc_tocha.linear1.bias.shape == enc_torch.linear1.bias.shape}")
+print(f"{enc_tocha.linear2.weights.shape == enc_torch.linear2.weight.T.shape}")
+print(f"{enc_tocha.linear2.bias.shape == enc_torch.linear2.bias.shape}")
+print(f"{enc_tocha.norm1.weight.shape , enc_torch.norm1.weight.shape}")
+print(f"{enc_tocha.norm1.bias.shape , enc_torch.norm1.bias.shape}")
+print(f"{enc_tocha.norm2.weight.shape , enc_torch.norm2.weight.shape}")
+print(f"{enc_tocha.norm2.bias.shape , enc_torch.norm2.bias.shape}")
+
 enc_tocha.linear1.weights.data = enc_torch.linear1.weight.T.detach().numpy()
 enc_tocha.linear1.bias.data = enc_torch.linear1.bias.detach().numpy()
 enc_tocha.linear2.weights.data = enc_torch.linear2.weight.T.detach().numpy()
@@ -258,7 +269,7 @@ x_tocha = tocha.tensor(xnp, requires_grad=True)
 x_torch = torch.tensor(xnp, requires_grad=True)
 
 out_tocha = enc_tocha(x_tocha)
-# out_torch = enc_torch(x_torch)
+out_torch = enc_torch(x_torch)
 
-# passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
-# print(passforward)
+passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
+print(passforward)
