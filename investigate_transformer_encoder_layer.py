@@ -135,6 +135,46 @@ def making_torch_manually():
     {batch_first=}
     {bias=}""")
 
+class TransformerEncoderLayer(Module):
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        dim_feedforwad: int,
+        dropout: float = 0.1,
+        layer_norm_eps: float = 1e-5,
+    ) -> None:
+        super().__init__()
+        self.d_model = d_model
+        self.nhead = nhead
+        self.dim_feedforwad = dim_feedforwad
+        self.layer_norm_eps = layer_norm_eps
+        
+        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.linear1 = Linear(d_model, dim_feedforwad)
+        self.linear2 = Linear(dim_feedforwad, d_model)
+        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.dropout = Dropout(dropout)
+        self.dropout1 = Dropout(dropout)
+        self.dropout2 = Dropout(dropout)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # Attention, dropout, norm
+        out = self.self_attn(x, x, x)
+        out = self.dropout(out)
+        # print(out.shape, x.shape, (x + out).shape, type(x), type(out))
+        out = self.norm1(x + out)
+        # Feedforward
+        out_ff = self.linear1(out)
+        out_ff = self.dropout1(out_ff)
+        out_ff = F.relu(out_ff)
+        out_ff = self.linear2(out_ff)
+        # Dropout, norm
+        out_ff = self.dropout2(out_ff)
+        out = self.norm2(out + out_ff)
+        return out
+
 
 def equate_torch_to_tocha_attention(torc, toch, bias, num_heads):
     qkv_weight = torc.in_proj_weight
@@ -172,104 +212,59 @@ def equate_torch_to_tocha_attention(torc, toch, bias, num_heads):
     if bias:
         toch.out_proj_bias.data = out_bias.detach().numpy()
 
+def equate_torch_to_tocha_transformer_encoder_layer(torc, toch):
+    equate_torch_to_tocha_attention(torc.self_attn, toch.self_attn, True, toch.nhead)
+    
+    toch.linear1.weights.data = torc.linear1.weight.T.detach().numpy()
+    toch.linear1.bias.data = torc.linear1.bias.detach().numpy()
+    toch.linear2.weights.data = torc.linear2.weight.T.detach().numpy()
+    toch.linear2.bias.data = torc.linear2.bias.detach().numpy()
+    toch.norm1.weight.data = torc.norm1.weight.detach().numpy()
+    toch.norm1.bias.data = torc.norm1.bias.detach().numpy()
+    toch.norm2.weight.data = torc.norm2.weight.detach().numpy()
+    toch.norm2.bias.data = torc.norm2.bias.detach().numpy()
 
-class TransformerEncoderLayer(Module):
-    def __init__(
-        self,
-        d_model: int,
-        nhead: int,
-        dim_feedforwad: int,
-        dropout: float = 0.1,
-        layer_norm_eps: float = 1e-5,
-    ) -> None:
-        super().__init__()
-        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
-        self.linear1 = Linear(d_model, dim_feedforwad)
-        self.linear2 = Linear(dim_feedforwad, d_model)
-        self.norm1 = LayerNorm((seq_len, d_model), eps=layer_norm_eps)
-        self.norm2 = LayerNorm((seq_len, d_model), eps=layer_norm_eps)
-        self.dropout = Dropout(dropout)
-        self.dropout1 = Dropout(dropout)
-        self.dropout2 = Dropout(dropout)
+np.random.seed(0)
+torch.manual_seed(0)
+for _ in range(100):
+    batch_size = np.random.randint(1, 5)
+    seq_len = np.random.randint(1, 5)
+    nhead = np.random.randint(1, 5)
+    d_model = np.random.randint(1, 5) * nhead
+    dim_feedforward = np.random.randint(1, 5)
+    layer_norm_eps = np.random.random() * 10 ** np.random.randint(-5, 0)
+    dropout = 0.0
+    batch_first = True
 
-    def forward(self, x: Tensor) -> Tensor:
-        # Attention, dropout, norm
-        out = self.self_attn(x, x, x)
-        out = self.dropout(out)
-        # print(out.shape, x.shape, (x + out).shape, type(x), type(out))
-        out = self.norm1(x + out)
-        # Feedforward
-        out_ff = self.linear1(out)
-        out_ff = self.dropout1(out_ff)
-        out_ff = F.relu(out_ff)
-        out_ff = self.linear2(out_ff)
-        # Dropout, norm
-        out_ff = self.dropout2(out_ff)
-        out = self.norm2(out + out_ff)
-        return out
+    enc_tocha = TransformerEncoderLayer(
+        d_model, nhead, dim_feedforward, dropout, layer_norm_eps=layer_norm_eps
+    )
+    enc_torch = torch.nn.TransformerEncoderLayer(
+        d_model=d_model,
+        nhead=nhead,
+        dim_feedforward=dim_feedforward,
+        dropout=dropout,
+        layer_norm_eps=layer_norm_eps,
+        batch_first=batch_first,
+    )
+    equate_torch_to_tocha_transformer_encoder_layer(enc_torch, enc_tocha)
+    
+    xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
+    x_tocha = tocha.tensor(xnp, requires_grad=True)
+    x_torch = torch.tensor(xnp, requires_grad=True)
 
-batch_size = 2
-seq_len = 3
-d_model = 2
-nhead = 2
-dim_feedforward = 5
-dropout = 0.0
-layer_norm_eps = 1e-5
-batch_first = True
-bias = True
+    out_tocha = enc_tocha(x_tocha)
+    out_torch = enc_torch(x_torch)
 
-enc_tocha = TransformerEncoderLayer(
-    d_model, nhead, dim_feedforward, dropout, layer_norm_eps=layer_norm_eps
-)
-enc_torch = torch.nn.TransformerEncoderLayer(
-    d_model=d_model,
-    nhead=nhead,
-    dim_feedforward=dim_feedforward,
-    dropout=dropout,
-    layer_norm_eps=layer_norm_eps,
-    batch_first=batch_first,
-)
-
-
-# for n, p in enc_tocha.named_parameters():
-#     print(n, type(p), p.shape)
-
-
-equate_torch_to_tocha_attention(enc_torch.self_attn, enc_tocha.self_attn, bias, nhead)
-# enc_man.self_attn.in_proj_weight = enc_torch.self_attn.in_proj_weight
-# enc_man.self_attn.in_proj_bias = enc_torch.self_attn.in_proj_bias
-# enc_man.self_attn.out_proj.weight = enc_torch.self_attn.out_proj.weight
-# enc_man.self_attn.out_proj.bias = enc_torch.self_attn.out_proj.bias
-# equate_torch_to_tocha_attention(enc_man.self_attn, enc_torch.self_attn, bias, nhead)
-
-# COMPARE SHAPES:
-print(f"{enc_tocha.linear1.weights.shape == enc_torch.linear1.weight.T.shape}")
-print(f"{enc_tocha.linear1.bias.shape == enc_torch.linear1.bias.shape}")
-print(f"{enc_tocha.linear2.weights.shape == enc_torch.linear2.weight.T.shape}")
-print(f"{enc_tocha.linear2.bias.shape == enc_torch.linear2.bias.shape}")
-print(f"{enc_tocha.norm1.weight.shape , enc_torch.norm1.weight.shape}")
-print(f"{enc_tocha.norm1.bias.shape , enc_torch.norm1.bias.shape}")
-print(f"{enc_tocha.norm2.weight.shape , enc_torch.norm2.weight.shape}")
-print(f"{enc_tocha.norm2.bias.shape , enc_torch.norm2.bias.shape}")
-
-enc_tocha.linear1.weights.data = enc_torch.linear1.weight.T.detach().numpy()
-enc_tocha.linear1.bias.data = enc_torch.linear1.bias.detach().numpy()
-enc_tocha.linear2.weights.data = enc_torch.linear2.weight.T.detach().numpy()
-enc_tocha.linear2.bias.data = enc_torch.linear2.bias.detach().numpy()
-enc_tocha.norm1.weight.data = enc_torch.norm1.weight.detach().numpy()
-enc_tocha.norm1.bias.data = enc_torch.norm1.bias.detach().numpy()
-enc_tocha.norm2.weight.data = enc_torch.norm2.weight.detach().numpy()
-enc_tocha.norm2.bias.data = enc_torch.norm2.bias.detach().numpy()
-
-# for n, p in enc_tocha.named_parameters():
-#     print(n, type(p), p.shape)
-
-xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
-x_tocha = tocha.tensor(xnp, requires_grad=True)
-x_torch = torch.tensor(xnp, requires_grad=True)
-
-out_tocha = enc_tocha(x_tocha)
-out_torch = enc_torch(x_torch)
-
-passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
-print(passforward)
+    passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-4)
+    assert passforward, "forward pass failed"
+    
+    gradnp = np.random.randn(*out_tocha.shape).astype(np.float32)
+    grad_tocha = tocha.tensor(gradnp, requires_grad=False)
+    grad_torch = torch.tensor(gradnp, requires_grad=False)
+    
+    out_tocha.backward(grad_tocha)
+    out_torch.backward(grad_torch)
+    
+    passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-4)
+    assert passbackward, "backward pass failed"

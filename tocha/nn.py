@@ -284,7 +284,6 @@ class LayerNorm(Module):
             self.bias = Parameter(np.zeros(self.normalized_shape))
 
     def forward(self, x: Tensor) -> Tensor:
-        print(x.shape, type(len(x.shape)))
         dims = tuple(len(x.shape) - i for i in range(len(self.normalized_shape), 0, -1))
         mean = x.mean(dims, keepdims=True)
         var = ((x - mean) ** 2).mean(dims, keepdims=True)
@@ -630,3 +629,43 @@ class MultiheadAttention(Module):
         if self.dropout is not None:
             output = self.dropout(output)
         return output
+
+class TransformerEncoderLayer(Module):
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        dim_feedforwad: int,
+        dropout: float = 0.1,
+        layer_norm_eps: float = 1e-5,
+    ) -> None:
+        super().__init__()
+        self.d_model = d_model
+        self.nhead = nhead
+        self.dim_feedforwad = dim_feedforwad
+        self.layer_norm_eps = layer_norm_eps
+        
+        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.linear1 = Linear(d_model, dim_feedforwad)
+        self.linear2 = Linear(dim_feedforwad, d_model)
+        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.dropout = Dropout(dropout)
+        self.dropout1 = Dropout(dropout)
+        self.dropout2 = Dropout(dropout)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # Attention, dropout, norm
+        out = self.self_attn(x, x, x)
+        out = self.dropout(out)
+        # print(out.shape, x.shape, (x + out).shape, type(x), type(out))
+        out = self.norm1(x + out)
+        # Feedforward
+        out_ff = self.linear1(out)
+        out_ff = self.dropout1(out_ff)
+        out_ff = F.relu(out_ff)
+        out_ff = self.linear2(out_ff)
+        # Dropout, norm
+        out_ff = self.dropout2(out_ff)
+        out = self.norm2(out + out_ff)
+        return out
