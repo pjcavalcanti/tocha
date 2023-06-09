@@ -29,7 +29,7 @@ class TestTransformerEncoderLayer(unittest.TestCase):
                 layer_norm_eps=layer_norm_eps,
                 batch_first=batch_first,
             )
-            equate_torch_to_tocha_transformer_encoder_layer(enc_torch, enc_tocha)
+            equate_tocha_to_torch_transformer_encoder_layer(enc_tocha, enc_torch)
             
             xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
             x_tocha = tocha.tensor(xnp, requires_grad=True)
@@ -51,7 +51,7 @@ class TestTransformerEncoderLayer(unittest.TestCase):
             passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-4)
             assert passbackward, "backward pass failed"
             
-def equate_torch_to_tocha_attention(torc, toch, bias, num_heads):
+def equate_tocha_to_torch_attention(toch, torc, bias, num_heads):
     qkv_weight = torc.in_proj_weight
     out_weight = torc.out_proj.weight
     if bias:
@@ -87,8 +87,8 @@ def equate_torch_to_tocha_attention(torc, toch, bias, num_heads):
     if bias:
         toch.out_proj_bias.data = out_bias.detach().numpy()
 
-def equate_torch_to_tocha_transformer_encoder_layer(torc, toch):
-    equate_torch_to_tocha_attention(torc.self_attn, toch.self_attn, True, toch.nhead)
+def equate_tocha_to_torch_transformer_encoder_layer(toch, torc):
+    equate_tocha_to_torch_attention(toch.self_attn, torc.self_attn, True, toch.nhead)
     
     toch.linear1.weights.data = torc.linear1.weight.T.detach().numpy()
     toch.linear1.bias.data = torc.linear1.bias.detach().numpy()

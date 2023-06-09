@@ -645,7 +645,7 @@ class TransformerEncoderLayer(Module):
         self.dim_feedforwad = dim_feedforwad
         self.layer_norm_eps = layer_norm_eps
         
-        self.self_attn = MultiheadAttention(d_model, nhead, dropout=dropout)
+        self.self_attn = MultiheadAttention(d_model, nhead)
         self.linear1 = Linear(d_model, dim_feedforwad)
         self.linear2 = Linear(dim_feedforwad, d_model)
         self.norm1 = LayerNorm(d_model, eps=layer_norm_eps)
@@ -658,14 +658,64 @@ class TransformerEncoderLayer(Module):
         # Attention, dropout, norm
         out = self.self_attn(x, x, x)
         out = self.dropout(out)
-        # print(out.shape, x.shape, (x + out).shape, type(x), type(out))
         out = self.norm1(x + out)
         # Feedforward
         out_ff = self.linear1(out)
-        out_ff = self.dropout1(out_ff)
+        out_ff = self.dropout1(out_ff) # not sure if this dropout should be here
         out_ff = F.relu(out_ff)
         out_ff = self.linear2(out_ff)
         # Dropout, norm
         out_ff = self.dropout2(out_ff)
         out = self.norm2(out + out_ff)
         return out
+    
+class TransformerDecoderLayer(Module):
+    def __init__(
+        self,
+        d_model: int,
+        nhead: int,
+        dim_feedforward: int,
+        layer_norm_eps: float = 1e-5,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+        assert d_model % nhead == 0, "d_model must be divisible by nhead"
+        assert dropout >= 0 and dropout <= 1, "dropout must be between 0 and 1"
+        
+        self.d_model = d_model
+        self.nhead = nhead
+        self.dim_feedforward = dim_feedforward
+        self.head_dim = d_model // nhead
+
+        self.self_attn = MultiheadAttention(d_model, nhead)
+        self.multihead_attn = MultiheadAttention(d_model, nhead)
+
+        self.linear1 = Linear(d_model, dim_feedforward)
+        self.linear2 = Linear(dim_feedforward, d_model)
+
+        self.norm1 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm2 = LayerNorm(d_model, eps=layer_norm_eps)
+        self.norm3 = LayerNorm(d_model, eps=layer_norm_eps)
+
+        self.dropout = Dropout(dropout)
+
+    def forward(self, tgt: Tensor, memory: Tensor) -> Tensor:
+        # First attention on input
+        out1 = self.self_attn(tgt, tgt, tgt)
+        out1 = self.dropout(out1)
+        out1 = self.norm1(out1 + tgt)
+
+        # Second attention on encoder output and output of first attention
+        out2 = self.multihead_attn(out1, memory, memory)
+        out2 = self.dropout(out2)
+        out2 = self.norm2(out2 + out1)
+
+        # Feedforward
+        out3 = self.linear1(out2)
+        out3 = self.dropout(out3)
+        out3 = F.relu(out3)
+        out3 = self.linear2(out3)
+        out4 = self.dropout(out3)
+        out4 = self.norm3(out4 + out2)
+
+        return out4
