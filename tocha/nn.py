@@ -137,6 +137,8 @@ class Sequential(Module):
     def named_modules(self) -> Iterator[Tuple[str, Parameter]]:
         for l, layer in enumerate(self.layers):
             yield f"{l}", layer
+            for name, module in layer.named_modules():
+                yield f"{l}.{name}", module
             
     def __getitem__(self, i):
         assert isinstance(i, int), "Index must be an integer"
