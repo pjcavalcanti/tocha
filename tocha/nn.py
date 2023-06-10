@@ -128,6 +128,11 @@ class Sequential(Module):
         for layer in self.layers:
             out = layer(out)
         return out
+    
+    def named_parameters(self) -> Iterator[Tuple[str, Parameter]]:
+        for l, layer in enumerate(self.layers):
+            for name, param in layer.named_parameters():
+                yield f"{l}.{name}", param
 
 
 ## Regularization layers
