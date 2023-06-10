@@ -44,8 +44,8 @@ l3 = torch.nn.Linear(6, 7)
 seq = torch.nn.Sequential(l1, l2, l3)
 
 # print(seq[0].weight)
-for n, p in seq.named_parameters():
-    print(n, p.shape)
+for n, m in seq.named_modules():
+    print(n)
 print("\n")
 
 l1p = Linear(4, 5)
@@ -53,5 +53,8 @@ l2p = Linear(5, 6)
 l3p = Linear(6, 7)
 seqp = Sequential([l1p, l2p, l3p])
 
+for n, m in seqp.named_modules():
+    print(n)
+
 for n, p in seqp.named_parameters():
-    print(n, p.shape)
+    print(n)
