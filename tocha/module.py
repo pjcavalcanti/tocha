@@ -59,7 +59,6 @@ class Module:
                 yield from var[1].parameters()
                 
     def named_parameters(self) -> Iterator[Tuple[str, Parameter]]:
-        params = {}
         for var in vars(self).items():
             if isinstance(var[1], Parameter):
                 yield var[0], var[1]
@@ -71,6 +70,8 @@ class Module:
         for var in vars(self).items():
             if isinstance(var[1], Module):
                 yield var[0], var[1]
+                for name, module in var[1].named_modules():
+                    yield f"{var[0]}.{name}", module
                     
     def children(self) -> Iterator["Module"]:
         for var in vars(self).items():

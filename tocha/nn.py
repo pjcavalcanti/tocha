@@ -133,9 +133,14 @@ class Sequential(Module):
         for l, layer in enumerate(self.layers):
             for name, param in layer.named_parameters():
                 yield f"{l}.{name}", param
+    
     def named_modules(self) -> Iterator[Tuple[str, Parameter]]:
         for l, layer in enumerate(self.layers):
             yield f"{l}", layer
+            
+    def __getitem__(self, i):
+        assert isinstance(i, int), "Index must be an integer"
+        return self.layers[i]
 
 
 ## Regularization layers
