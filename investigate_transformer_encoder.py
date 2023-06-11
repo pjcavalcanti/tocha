@@ -61,71 +61,79 @@ def equate_tocha_to_torch_transformer_encoder_layer(toch, torc):
     toch.norm2.bias.data = torc.norm2.bias.detach().numpy()
 
 
-n_head = 3
-d_model = 5 * n_head
-dim_feedforward = 7
-dropout = 0.0
-layer_norm_eps = 1e-5
+np.random.seed(0)
+torch.manual_seed(0)
+for _ in range(10):
+    n_head = 3
+    d_model = 5 * n_head
+    dim_feedforward = 7
+    dropout = 0.0
+    layer_norm_eps = 1e-5
 
-num_layers = 2
+    num_layers = int(np.random.randint(1, 3))
+    print(num_layers)
 
-enc_layer_torch = torch.nn.TransformerEncoderLayer(
-    d_model=d_model,
-    nhead=n_head,
-    dim_feedforward=dim_feedforward,
-    dropout=dropout,
-    layer_norm_eps=layer_norm_eps,
-    batch_first=True,
-)
+    batch_size = 2
+    seq_len = 3
 
-enc_torch = torch.nn.TransformerEncoder(
-    encoder_layer=enc_layer_torch, num_layers=num_layers
-)
+    enc_layer_torch = torch.nn.TransformerEncoderLayer(
+        d_model=d_model,
+        nhead=n_head,
+        dim_feedforward=dim_feedforward,
+        dropout=dropout,
+        layer_norm_eps=layer_norm_eps,
+        batch_first=True,
+    )
 
-batch_size = 2
-seq_len = 3
+    enc_torch = torch.nn.TransformerEncoder(
+        encoder_layer=enc_layer_torch, num_layers=num_layers
+    )
 
-xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
-x = torch.tensor(xnp, requires_grad=True)
+    class TransformerEncoder(Module):
+        def __init__(
+            self, encoder_layer: Iterable[TransformerEncoderLayer], num_layers: int
+        ) -> None:
+            super().__init__()
+            self.layers = Sequential([copy.deepcopy(encoder_layer) for _ in range(num_layers)])
 
-out1 = enc_torch(x)
-out2 = enc_layer_torch(enc_layer_torch(x))
+        def forward(self, x: Tensor) -> Tensor:
+            return self.layers(x)
 
-
-class TransformerEncoder(Module):
-    def __init__(
-        self, encoder_layer: Iterable[TransformerEncoderLayer], num_layers: int
-    ) -> None:
-        super().__init__()
-        self.layers = Sequential([copy.deepcopy(encoder_layer) for _ in range(num_layers)])
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self.layers(x)
-
-    # def named_modules(self) -> Iterator[Tuple[str, Parameter]]:
-    #     for n, m in self.layers.named_modules():
-    #         yield n, m
-    # def named_parameters(self) -> Iterator[Tuple[str, Parameter]]:
-    #     for n, p in self.layers.named_parameters():
-    #         yield n, p
+    enc_layer_tocha = TransformerEncoderLayer(
+        d_model=d_model,
+        dim_feedforwad=dim_feedforward,
+        nhead=n_head,
+        dropout=dropout,
+        layer_norm_eps=layer_norm_eps,
+    )
+    equate_tocha_to_torch_transformer_encoder_layer(enc_layer_tocha, enc_layer_torch)
+    enc_tocha = TransformerEncoder(encoder_layer=enc_layer_tocha, num_layers=num_layers)
 
 
-enc_layer_tocha = TransformerEncoderLayer(
-    d_model=d_model,
-    dim_feedforwad=dim_feedforward,
-    nhead=n_head,
-    dropout=dropout,
-    layer_norm_eps=layer_norm_eps,
-)
-equate_tocha_to_torch_transformer_encoder_layer(enc_layer_tocha, enc_layer_torch)
-enc_tocha = TransformerEncoder(encoder_layer=enc_layer_tocha, num_layers=num_layers)
+    xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
+    x_tocha = tocha.tensor(xnp, requires_grad=True)
+    x_torch = torch.tensor(xnp, requires_grad=True)
 
-for n, m in enc_torch.named_modules():
-    print(n)
-print("\n")
-for n, m in enc_tocha.named_modules():
-    print(n)
+    out_tocha = enc_tocha(x_tocha)
+    out_torch = enc_torch(x_torch)
+
+    passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
+    # print(f"passforward: {passforward}")
     
+    grad = np.random.randn(*out_tocha.shape).astype(np.float32)
+    grad_tocha = tocha.tensor(grad)
+    grad_torch = torch.tensor(grad)
+    
+    out_tocha.backward(grad_tocha)
+    out_torch.backward(grad_torch)
+    
+    passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-5)
+    print(passbackward)
+
+
+
+
+
 # for n, m in enc_tocha.layers[0].named_modules():
 #     print(n, type(m))
 

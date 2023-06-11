@@ -4,7 +4,7 @@ from tocha.module import Module, Parameter
 from autograd.tensor import Tensor, Arrayable, ensure_array
 
 import numpy as np
-from typing import Iterator, List, Optional, Tuple, Union
+from typing import Iterable, Iterator, List, Optional, Tuple, Union
 import copy
 
 ## Non-linearities
@@ -734,3 +734,24 @@ class TransformerDecoderLayer(Module):
         out4 = self.norm3(out4 + out2)
 
         return out4
+    
+class TransformerEncoder(Module):
+    def __init__(
+        self, encoder_layer: Iterable[TransformerEncoderLayer], num_layers: int
+    ) -> None:
+        super().__init__()
+        self.layers = Sequential([copy.deepcopy(encoder_layer) for _ in range(num_layers)])
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.layers(x)
+    
+class TransformerDecoder(Module):
+    def __init__(self, decoder_layer: TransformerDecoderLayer, num_layers: int) -> None:
+        super().__init__()
+        self.layers = [copy.deepcopy(decoder_layer) for _ in range(num_layers)]
+
+    def forward(self, tgt: Tensor, memory: Tensor) -> Tensor:
+        out = tgt
+        for layer in self.layers:
+            out = layer(out, memory)
+        return out
