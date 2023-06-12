@@ -63,14 +63,14 @@ def equate_tocha_to_torch_transformer_encoder_layer(toch, torc):
 
 np.random.seed(0)
 torch.manual_seed(0)
-for _ in range(10):
+for _ in range(1):
     n_head = 3
     d_model = 5 * n_head
     dim_feedforward = 7
     dropout = 0.0
     layer_norm_eps = 1e-5
 
-    num_layers = int(np.random.randint(1, 3))
+    num_layers = 1 #int(np.random.randint(1, 3))
     print(num_layers)
 
     batch_size = 2
@@ -94,10 +94,21 @@ for _ in range(10):
             self, encoder_layer: Iterable[TransformerEncoderLayer], num_layers: int
         ) -> None:
             super().__init__()
-            self.layers = Sequential([copy.deepcopy(encoder_layer) for _ in range(num_layers)])
+            # self.layers = Sequential([copy.deepcopy(encoder_layer) for _ in range(num_layers)])
+            self.layers = []
+            # for n, p in encoder_layer.named_parameters():
+            #     print(n, p.shape)
+            for i in range(num_layers):
+                new_layer = copy.deepcopy(encoder_layer)
+                new_layer.self_attn.head_0.q_proj_weight.name = f"head_{i}.q_proj_weight"
+                self.layers.append(new_layer)
 
         def forward(self, x: Tensor) -> Tensor:
-            return self.layers(x)
+            # return self.layers(x)
+            out = x
+            for layer in self.layers:
+                out = layer(out)
+            return out
 
     enc_layer_tocha = TransformerEncoderLayer(
         d_model=d_model,
@@ -118,7 +129,7 @@ for _ in range(10):
     out_torch = enc_torch(x_torch)
 
     passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
-    # print(f"passforward: {passforward}")
+    print(f"passforward: {passforward}")
     
     grad = np.random.randn(*out_tocha.shape).astype(np.float32)
     grad_tocha = tocha.tensor(grad)
@@ -127,8 +138,8 @@ for _ in range(10):
     out_tocha.backward(grad_tocha)
     out_torch.backward(grad_torch)
     
-    passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-5)
-    print(passbackward)
+    # passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-5)
+    # print(passbackward)
 
 
 
