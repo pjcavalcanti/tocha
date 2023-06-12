@@ -601,7 +601,7 @@ class ScaledDotProductAttentionHead(Module):
         att = Q @ K.transpose((0, 2, 1)) / self.scale
         if att_mask is not None:
             att = att_mask * att
-        att = F.softmax(Q @ K.transpose((0, 2, 1)) / self.scale, dim=-1) @ V
+        att = F.softmax(att, dim=-1) @ V
         return att
 
 
