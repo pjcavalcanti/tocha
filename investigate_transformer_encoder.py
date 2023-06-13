@@ -112,7 +112,7 @@ for _ in range(1):
 
     enc_layer_tocha = TransformerEncoderLayer(
         d_model=d_model,
-        dim_feedforwad=dim_feedforward,
+        dim_feedforward=dim_feedforward,
         nhead=n_head,
         dropout=dropout,
         layer_norm_eps=layer_norm_eps,

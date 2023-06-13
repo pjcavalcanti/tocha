@@ -128,18 +128,18 @@ class Sequential(Module):
         for layer in self.layers:
             out = layer(out)
         return out
-    
+
     def named_parameters(self) -> Iterator[Tuple[str, Parameter]]:
         for l, layer in enumerate(self.layers):
             for name, param in layer.named_parameters():
                 yield f"{l}.{name}", param
-    
+
     def named_modules(self) -> Iterator[Tuple[str, Parameter]]:
         for l, layer in enumerate(self.layers):
             yield f"{l}", layer
             for name, module in layer.named_modules():
                 yield f"{l}.{name}", module
-            
+
     def __getitem__(self, i):
         assert isinstance(i, int), "Index must be an integer"
         return self.layers[i]
@@ -645,24 +645,26 @@ class MultiheadAttention(Module):
             output = self.dropout(output)
         return output
 
+
 class TransformerEncoderLayer(Module):
     def __init__(
         self,
         d_model: int,
         nhead: int,
-        dim_feedforwad: int,
+        dim_feedforward: int,
         dropout: float = 0.1,
         layer_norm_eps: float = 1e-5,
     ) -> None:
         super().__init__()
         self.d_model = d_model
         self.nhead = nhead
-        self.dim_feedforwad = dim_feedforwad
         self.layer_norm_eps = layer_norm_eps
-        
+        self.dim_feedforwad = dim_feedforward
+        self.layer_norm_eps = layer_norm_eps
+
         self.self_attn = MultiheadAttention(d_model, nhead)
-        self.linear1 = Linear(d_model, dim_feedforwad)
-        self.linear2 = Linear(dim_feedforwad, d_model)
+        self.linear1 = Linear(d_model, dim_feedforward)
+        self.linear2 = Linear(dim_feedforward, d_model)
         self.norm1 = LayerNorm(d_model, eps=layer_norm_eps)
         self.norm2 = LayerNorm(d_model, eps=layer_norm_eps)
         self.dropout = Dropout(dropout)
@@ -676,14 +678,15 @@ class TransformerEncoderLayer(Module):
         out = self.norm1(x + out)
         # Feedforward
         out_ff = self.linear1(out)
-        out_ff = self.dropout1(out_ff) # not sure if this dropout should be here
+        out_ff = self.dropout1(out_ff)  # not sure if this dropout should be here
         out_ff = F.relu(out_ff)
         out_ff = self.linear2(out_ff)
         # Dropout, norm
         out_ff = self.dropout2(out_ff)
         out = self.norm2(out + out_ff)
         return out
-    
+
+
 class TransformerDecoderLayer(Module):
     def __init__(
         self,
@@ -696,9 +699,10 @@ class TransformerDecoderLayer(Module):
         super().__init__()
         assert d_model % nhead == 0, "d_model must be divisible by nhead"
         assert dropout >= 0 and dropout <= 1, "dropout must be between 0 and 1"
-        
+
         self.d_model = d_model
         self.nhead = nhead
+        self.layer_norm_eps = layer_norm_eps
         self.dim_feedforward = dim_feedforward
         self.head_dim = d_model // nhead
 
@@ -734,24 +738,106 @@ class TransformerDecoderLayer(Module):
         out4 = self.norm3(out4 + out2)
 
         return out4
-    
+
+
 class TransformerEncoder(Module):
+    # Like in torch, all layers start with the same parameters
+    # This is unexpected, but it makes it easier to test against torch
     def __init__(
-        self, encoder_layer: Iterable[TransformerEncoderLayer], num_layers: int
+        self,
+        encoder_layer: Iterable[TransformerEncoderLayer],
+        num_layers: int,
+        norm: Optional[bool] = None,
     ) -> None:
         super().__init__()
-        self.layers = Sequential([copy.deepcopy(encoder_layer) for _ in range(num_layers)])
+        self.layers = [copy.deepcopy(encoder_layer) for _ in range(num_layers)]
+        self.norm = (
+            None
+            if norm is None
+            else LayerNorm(encoder_layer.d_model, eps=encoder_layer.layer_norm_eps)
+        )
 
     def forward(self, x: Tensor) -> Tensor:
-        return self.layers(x)
-    
+        out = x
+        for layer in self.layers:
+            out = layer(out)
+        if self.norm is not None:
+            out = self.norm(out)
+        return out
+
+
 class TransformerDecoder(Module):
-    def __init__(self, decoder_layer: TransformerDecoderLayer, num_layers: int) -> None:
+    # Like in torch, all layers start with the same parameters
+    # This is unexpected, but it makes it easier to test against torch
+    def __init__(
+        self,
+        decoder_layer: TransformerDecoderLayer,
+        num_layers: int,
+        norm: Optional[bool] = None,
+    ) -> None:
         super().__init__()
         self.layers = [copy.deepcopy(decoder_layer) for _ in range(num_layers)]
+        self.norm = (
+            None
+            if norm is None
+            else LayerNorm(decoder_layer.d_model, eps=decoder_layer.layer_norm_eps)
+        )
 
     def forward(self, tgt: Tensor, memory: Tensor) -> Tensor:
         out = tgt
         for layer in self.layers:
             out = layer(out, memory)
+        if self.norm is not None:
+            out = self.norm(out)
+        return out
+
+class Transformer(Module):
+    def __init__(
+        self,
+        d_model: float,
+        nhead: int,
+        num_encoder_layers: int,
+        num_decoder_layers: int,
+        dim_feedforward: int,
+        dropout: float = 0.1,
+        layer_norm_eps: float = 1e-5,
+    ) -> None:
+        super().__init__()
+        self.d_model = d_model
+        self.nhead = nhead
+        self.num_encoder_layers = num_encoder_layers
+        self.num_decoder_layers = num_decoder_layers
+        self.dim_feedforward = dim_feedforward
+        self.dropout = dropout
+        self.layer_norm_eps = layer_norm_eps
+
+        encoder_layer = TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            layer_norm_eps=layer_norm_eps,
+        )
+        decoder_layer = TransformerDecoderLayer(
+            d_model=d_model,
+            nhead=nhead,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            layer_norm_eps=layer_norm_eps,
+        )
+        self.encoder = TransformerEncoder(encoder_layer, num_encoder_layers, norm=True)
+        self.decoder = TransformerDecoder(decoder_layer, num_decoder_layers, norm=True)
+        
+        # randomize parameter initializations
+        for layer in [*self.encoder.layers, *self.decoder.layers]:
+            for n, p in layer.named_parameters():
+                parts = n.split(".")
+                param = getattr(layer, parts[0])
+                for part in parts[1:]:
+                    param = getattr(param, part)
+                param.data = np.random.randn(*param.shape).astype(np.float32)
+                
+    def forward(self, src: Tensor, tgt: Tensor) -> Tensor:
+        mem = self.encoder(src)
+        out = self.decoder(tgt, mem)
         return out
