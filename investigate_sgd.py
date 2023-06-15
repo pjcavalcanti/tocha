@@ -27,6 +27,8 @@ class MLP_tocha(nn.Module):
     def forward(self, x):
         x = sigmoid(self.fc1(x))
         x = sigmoid(self.fc2(x))
+        # x = self.fc1(x)
+        # x = self.fc2(x)
         return x
 
 
@@ -39,6 +41,8 @@ class MLP_torch(torch.nn.Module):
     def forward(self, x):
         x = torch.sigmoid(self.fc1(x))
         x = torch.sigmoid(self.fc2(x))
+        # x = self.fc1(x)
+        # x = self.fc2(x)
         return x
 
 
@@ -50,21 +54,26 @@ class SGD(Optimizer):
         momentum: float = 0,
         nesterov: bool = False,
     ) -> None:
-        assert lr > 0
-        assert momentum >= 0 and momentum <= 1
-        self.params = list(params)
-        self.lr = lr
+        # assert lr > 0
+        # assert momentum >= 0 and momentum <= 1
         self.momentum = momentum
-        self.v = [np.zeros(p.shape) for p in self.params]
+        self.lr = lr
+        self.params = list(params)
+        self.v = [np.zeros(p.shape).astype(p.data.dtype) for p in self.params]
 
     def step(self):
         for i, p in enumerate(self.params):
-            self.v[i] = self.momentum * self.v[i] - self.lr * p.grad.data
-            p.data += self.v[i]
+            # In Sutskever et al. we have
+            # self.v[i] = self.momentum * self.v[i] - self.lr * p.grad.data
+            # p.data += self.v[i]
+            # self.v[i] = self.momentum * self.v[i] + p.grad.data
+            # p.data = p.data - self.lr * self.v[i]
+            p.data += - self.lr * p.grad.data
 
 
 # generate circular data
 np.random.seed(0)
+torch.manual_seed(0)
 num_samples = 500
 
 # Inner circle
@@ -84,8 +93,8 @@ X_outer = np.column_stack([outer_x, outer_y])
 Y_outer = np.ones((num_samples // 2, 1))
 
 # Concatenate inner and outer circle
-X = np.vstack([X_inner, X_outer])
-Y = np.vstack([Y_inner, Y_outer])
+X = np.vstack([X_inner, X_outer]).astype(np.float64)
+Y = np.vstack([Y_inner, Y_outer]).astype(np.float64)
 
 # add Gaussian noise
 X += np.random.normal(0, 0.3, size=X.shape)
@@ -100,36 +109,84 @@ X_torch = torch.tensor(X)
 Y_torch = torch.tensor(Y)
 
 # Train
-lr0 = 0.01
-momentum = 0.1
+lr = 0.01
+momentum = 0
 mlp_tocha = MLP_tocha(2, 10, 1)
 mlp_torch = MLP_torch(2, 10, 1, dtype=torch.float64)
 equate_tocha_to_torch_linear(mlp_tocha.fc1, mlp_torch.fc1)
 equate_tocha_to_torch_linear(mlp_tocha.fc2, mlp_torch.fc2)
-optimizer_tocha = SGD(mlp_tocha.parameters(), lr=lr0, momentum=momentum)
-optimizer_torch = torch.optim.SGD(mlp_torch.parameters(), lr=lr0, momentum=momentum)
+optimizer_tocha = SGD(mlp_tocha.parameters(), lr=lr, momentum=momentum)
+optimizer_torch = torch.optim.SGD(mlp_torch.parameters(),lr=lr,momentum=momentum)
 
 out1 = mlp_tocha(X_tocha)
 out2 = mlp_torch(X_torch)
 # print(np.allclose(out1.data, out2.detach().numpy()))
 print(type(mlp_tocha), type(mlp_torch))
 print(type(optimizer_tocha), type(optimizer_torch))
+print(type(X_tocha.data.dtype), type(X_torch.data.dtype))
 
-def lr(e):
-    if e < 100:
-        return 1
-    if e < 300:
-        return 0.1
-    if e < 600:
-        return 0.01
-    return 0.001
+# def lr(e):
+#     if e < 100:
+#         return 1
+#     if e < 300:
+#         return 0.1
+#     if e < 600:
+#         return 0.01
+#     return 0.001
 
 
 losses_tocha = []
 losses_torch = []
 
-for epoch in range(1000):
-    idx = np.random.randint(0, len(X), (3))
+# for n,p in mlp_tocha.named_parameters():
+#     print(n, p.shape)
+# print("=================")
+# for n,p in mlp_torch.named_parameters():
+#     print(n, p.shape)
+# print("=================")
+for p in mlp_tocha.parameters():
+    print(p.shape)
+for p in mlp_torch.parameters():
+    print(p.shape)
+print(f"{optimizer_tocha.lr=}")
+print(f"{optimizer_torch.param_groups[0]['lr']=}")
+
+for epoch in range(2):
+    # num_samples = 500
+
+    # # Inner circle
+    # inner_radius = 2
+    # inner_angle = np.random.uniform(0, 2 * np.pi, num_samples // 2)
+    # inner_x = inner_radius * np.cos(inner_angle)
+    # inner_y = inner_radius * np.sin(inner_angle)
+    # X_inner = np.column_stack([inner_x, inner_y])
+    # Y_inner = np.zeros((num_samples // 2, 1))
+
+    # # Outer circle
+    # outer_radius = 5
+    # outer_angle = np.random.uniform(0, 2 * np.pi, num_samples // 2)
+    # outer_x = outer_radius * np.cos(outer_angle)
+    # outer_y = outer_radius * np.sin(outer_angle)
+    # X_outer = np.column_stack([outer_x, outer_y])
+    # Y_outer = np.ones((num_samples // 2, 1))
+
+    # # Concatenate inner and outer circle
+    # X = np.vstack([X_inner, X_outer]).astype(np.float64)
+    # Y = np.vstack([Y_inner, Y_outer]).astype(np.float64)
+
+    # # add Gaussian noise
+    # X += np.random.normal(0, 0.3, size=X.shape)
+
+    # X = X.astype(np.float64)
+    # Y = Y.astype(np.float64)
+
+    # # go to tensors
+    # X_tocha = tocha.tensor(X)
+    # Y_tocha = tocha.tensor(Y)
+    # X_torch = torch.tensor(X)
+    # Y_torch = torch.tensor(Y)
+
+    idx = np.random.randint(0, len(X), (32,))
 
     x_tocha = X_tocha[idx]
     y_tocha = Y_tocha[idx]
@@ -143,19 +200,40 @@ for epoch in range(1000):
     loss_torch = ((y_pred_torch - y_torch) * (y_pred_torch - y_torch)).sum()
     losses_torch.append(loss_torch.item())
 
-    # optimizer_tocha.lr = lr(epoch)
+    # print("Comparing parameters")
+    # for (n1, p1), (n2, p2) in zip(mlp_tocha.named_parameters(), mlp_torch.named_parameters()):
+    #     if "bias" in n1:
+    #         print(n1, np.allclose(p1.data, p2.detach().numpy()))
+    #     else:
+    #         print(n1, np.allclose(p1.data, p2.detach().T.numpy()))
+    # print("----------")
+    # for p in mlp_tocha.parameters():
+    #     p.zero_grad()
     optimizer_tocha.zero_grad()
     loss_tocha.backward()
-    optimizer_tocha.step()
+    # optimizer_tocha.step()
+    # for p in mlp_tocha.parameters():
+    #     p.data += - lr * p.grad.data
+    for n, p in mlp_tocha.named_parameters():
+        p.data += - lr * p.grad.data
+        # print(f"TOCHA {n} GRAD: {(lr * p.grad.data).sum()}")
 
-    # optimizer_torch.lr = lr(epoch) * 10
     optimizer_torch.zero_grad()
     loss_torch.backward()
+    # for n, p in mlp_torch.named_parameters():
+    #     p.data += - lr * p.grad.data
+    #     print(f"TORCH {n} GRAD: {(lr * p.grad.data).sum()}")
     optimizer_torch.step()
 
     # print(loss_tocha.data, loss_torch.item())
-    print(np.isclose(loss_torch.detach().numpy(), loss_tocha.data))
+    passloss = np.isclose(loss_torch.item(), loss_tocha.data, atol=1e-5)
+    passgrad1 = np.allclose(mlp_tocha.fc1.weights.grad.data, mlp_torch.fc1.weight.grad.T.data, atol=1e-5)
+    passgrad2 = np.allclose(mlp_tocha.fc2.weights.grad.data, mlp_torch.fc2.weight.grad.T.data, atol=1e-5)
+    passgrad3 = np.allclose(mlp_tocha.fc1.bias.grad.data, mlp_torch.fc1.bias.grad.data, atol=1e-5)
+    passgrad4 = np.allclose(mlp_tocha.fc2.bias.grad.data, mlp_torch.fc2.bias.grad.data, atol=1e-5)
+    print(passloss, passgrad1, passgrad2, passgrad3, passgrad4)
 
+    print("===============")            
 
 # plot decision boundary
 # x_range = np.linspace(X[:, 0].min(), X[:, 0].max(), 100)
@@ -170,8 +248,8 @@ for epoch in range(1000):
 # plt.scatter(X[:, 0], X[:, 1], c=Y[:, 0], edgecolors="k")
 # plt.show()
 
-plt.cla()
-plt.plot(losses_tocha, label="tocha")
-plt.plot(losses_torch, label="torch")
-plt.legend()
-plt.show()
+# plt.cla()
+# plt.plot(losses_tocha, label="tocha")
+# plt.plot(losses_torch, label="torch")
+# plt.legend()
+# plt.show()

@@ -56,7 +56,7 @@ class Module:
             if isinstance(var[1], Module):
                 for param in var[1].parameters():
                     yield param
-                yield from var[1].parameters()
+                # yield from var[1].parameters()
                 
     def named_parameters(self) -> Iterator[Tuple[str, Parameter]]:
         for var in vars(self).items():

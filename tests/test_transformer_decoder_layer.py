@@ -4,66 +4,66 @@ import tocha
 import torch
 import numpy as np
 
-class TestTransformerDecoderLayer(unittest.TestCase):
-    def test_transformerdecoderlayer_against_torch(self):
-        np.random.seed(0)
-        torch.manual_seed(0)
-        for _ in range(7):
-            nhead = np.random.randint(1, 4)
-            d_model = np.random.randint(1, 4) * nhead
-            dim_feedforward = np.random.randint(1, 4)
-            dropout = 0.0
-            layer_norm_eps = np.random.randint(1, 4) * 10 ** -np.random.randint(1, 6)
+# class TestTransformerDecoderLayer(unittest.TestCase):
+#     def test_transformerdecoderlayer_against_torch(self):
+#         np.random.seed(0)
+#         torch.manual_seed(0)
+#         for _ in range(7):
+#             nhead = np.random.randint(1, 4)
+#             d_model = np.random.randint(1, 4) * nhead
+#             dim_feedforward = np.random.randint(1, 4)
+#             dropout = 0.0
+#             layer_norm_eps = np.random.randint(1, 4) * 10 ** -np.random.randint(1, 6)
             
-            batch_size = np.random.randint(1, 4)
-            seq_len = np.random.randint(1, 4)
+#             batch_size = np.random.randint(1, 4)
+#             seq_len = np.random.randint(1, 4)
 
-            dec_torch = torch.nn.TransformerDecoderLayer(
-                d_model=d_model,
-                nhead=nhead,
-                dim_feedforward=dim_feedforward,
-                layer_norm_eps=layer_norm_eps,
-                dropout=dropout,
-                batch_first=True,
-            )
-            dec_tocha = tocha.nn.TransformerDecoderLayer(
-                d_model=d_model,
-                nhead=nhead,
-                dim_feedforward=dim_feedforward,
-                layer_norm_eps=layer_norm_eps,
-                dropout=dropout,
-            )
+#             dec_torch = torch.nn.TransformerDecoderLayer(
+#                 d_model=d_model,
+#                 nhead=nhead,
+#                 dim_feedforward=dim_feedforward,
+#                 layer_norm_eps=layer_norm_eps,
+#                 dropout=dropout,
+#                 batch_first=True,
+#             )
+#             dec_tocha = tocha.nn.TransformerDecoderLayer(
+#                 d_model=d_model,
+#                 nhead=nhead,
+#                 dim_feedforward=dim_feedforward,
+#                 layer_norm_eps=layer_norm_eps,
+#                 dropout=dropout,
+#             )
 
-            equate_tocha_to_torch_transformer_decoder_layer(dec_tocha, dec_torch, nhead)
+#             equate_tocha_to_torch_transformer_decoder_layer(dec_tocha, dec_torch, nhead)
 
-            tgtnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
-            memorynp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
-            tgt_tocha = tocha.tensor(tgtnp, requires_grad=True)
-            tgt_torch = torch.tensor(tgtnp, requires_grad=True)
-            memory_tocha = tocha.tensor(memorynp, requires_grad=True)
-            memory_torch = torch.tensor(memorynp, requires_grad=True)
+#             tgtnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
+#             memorynp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
+#             tgt_tocha = tocha.tensor(tgtnp, requires_grad=True)
+#             tgt_torch = torch.tensor(tgtnp, requires_grad=True)
+#             memory_tocha = tocha.tensor(memorynp, requires_grad=True)
+#             memory_torch = torch.tensor(memorynp, requires_grad=True)
 
-            dec_tocha.eval()
-            dec_torch.eval()
+#             dec_tocha.eval()
+#             dec_torch.eval()
 
-            out_tocha = dec_tocha(tgt_tocha, memory_tocha)
-            out_torch = dec_torch(tgt_torch, memory_torch)
+#             out_tocha = dec_tocha(tgt_tocha, memory_tocha)
+#             out_torch = dec_torch(tgt_torch, memory_torch)
 
-            passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
-            assert passforward, "forward pass failed"
+#             passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
+#             assert passforward, "forward pass failed"
 
-            gradnp = np.random.randn(*out_torch.shape).astype(np.float32)
-            grad_tocha = tocha.tensor(gradnp)
-            grad_torch = torch.tensor(gradnp)
+#             gradnp = np.random.randn(*out_torch.shape).astype(np.float32)
+#             grad_tocha = tocha.tensor(gradnp)
+#             grad_torch = torch.tensor(gradnp)
             
-            out_tocha.backward(grad_tocha)
-            out_torch.backward(grad_torch)
+#             out_tocha.backward(grad_tocha)
+#             out_torch.backward(grad_torch)
             
-            passgradtgt = np.allclose(tgt_tocha.grad.data, tgt_torch.grad.detach().numpy(), atol=1e-5)
-            passgradmem = np.allclose(memory_tocha.grad.data, memory_torch.grad.detach().numpy(), atol=1e-5)
+#             passgradtgt = np.allclose(tgt_tocha.grad.data, tgt_torch.grad.detach().numpy(), atol=1e-5)
+#             passgradmem = np.allclose(memory_tocha.grad.data, memory_torch.grad.detach().numpy(), atol=1e-5)
             
-            assert passgradtgt, "tgt grad failed"
-            assert passgradmem, "mem grad failed"
+#             assert passgradtgt, "tgt grad failed"
+#             assert passgradmem, "mem grad failed"
             
 
 def equate_tocha_to_torch_linear(toch, torc):

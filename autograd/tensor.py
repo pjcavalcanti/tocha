@@ -65,7 +65,11 @@ class Tensor:
         return f"Tensor({self.data}, requires_grad={self.requires_grad})"
 
     def zero_grad(self) -> None:
-        self.grad = Tensor(np.zeros_like(self.data))
+        if self.grad is None:
+            self.grad = Tensor(np.zeros_like(self.data))
+        else:
+            self.grad.data = np.zeros_like(self.grad.data)
+        # self.grad = Tensor(np.zeros_like(self.data))
 
     # Function to compute gradients, recursively applying the chain rule
     def backward(self, grad: Optional["Tensor"] = None) -> None:
