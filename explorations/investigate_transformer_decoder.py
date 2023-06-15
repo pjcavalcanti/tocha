@@ -11,13 +11,13 @@ import tocha.functional as F
 from tocha.nn import TransformerDecoderLayer, Sequential, Linear, Module
 
 def equate_tocha_to_torch_linear(toch, torc):
-    toch.weights.data = torc.weight.T.detach().numpy()
-    toch.bias.data = torc.bias.detach().numpy()
+    toch.weights.data = torc.weight.T.detach().numpy().copy()
+    toch.bias.data = torc.bias.detach().numpy().copy()
 
 
 def equate_tocha_to_torch_layer_norm(toch, torc):
-    toch.weight.data = torc.weight.detach().numpy()
-    toch.bias.data = torc.bias.detach().numpy()
+    toch.weight.data = torc.weight.detach().numpy().copy()
+    toch.bias.data = torc.bias.detach().numpy().copy()
 
 
 def equate_tocha_to_torch_attention(toch, torc, bias, num_heads):
@@ -43,18 +43,18 @@ def equate_tocha_to_torch_attention(toch, torc, bias, num_heads):
 
     for h, (wq, wk, wv) in enumerate(zip(head_wq, head_wk, head_wv)):
         head = getattr(toch, f"head_{h}")
-        head.q_proj_weight.data = wq.detach().numpy()
-        head.k_proj_weight.data = wk.detach().numpy()
-        head.v_proj_weight.data = wv.detach().numpy()
+        head.q_proj_weight.data = wq.detach().numpy().copy()
+        head.k_proj_weight.data = wk.detach().numpy().copy()
+        head.v_proj_weight.data = wv.detach().numpy().copy()
     if bias:
         for h, (bq, bk, bv) in enumerate(zip(head_bq, head_bk, head_bv)):
             head = getattr(toch, f"head_{h}")
-            head.q_proj_bias.data = bq.detach().numpy()
-            head.k_proj_bias.data = bk.detach().numpy()
-            head.v_proj_bias.data = bv.detach().numpy()
-    toch.out_proj_weight.data = out_weight.t().detach().numpy()
+            head.q_proj_bias.data = bq.detach().numpy().copy()
+            head.k_proj_bias.data = bk.detach().numpy().copy()
+            head.v_proj_bias.data = bv.detach().numpy().copy()
+    toch.out_proj_weight.data = out_weight.t().detach().numpy().copy()
     if bias:
-        toch.out_proj_bias.data = out_bias.detach().numpy()
+        toch.out_proj_bias.data = out_bias.detach().numpy().copy()
 
 
 def equate_tocha_to_torch_transformer_decoder_layer(toch, torc, nhead):

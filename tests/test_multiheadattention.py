@@ -60,18 +60,18 @@ class TestMultiheadAttention(unittest.TestCase):
 
             for h, (wq, wk, wv) in enumerate(zip(head_wq, head_wk, head_wv)):
                 head = getattr(attention_tocha, f"head_{h}")
-                head.q_proj_weight.data = wq.detach().numpy()
-                head.k_proj_weight.data = wk.detach().numpy()
-                head.v_proj_weight.data = wv.detach().numpy()
+                head.q_proj_weight.data = wq.detach().numpy().copy()
+                head.k_proj_weight.data = wk.detach().numpy().copy()
+                head.v_proj_weight.data = wv.detach().numpy().copy()
             if bias:
                 for h, (bq, bk, bv) in enumerate(zip(head_bq, head_bk, head_bv)):
                     head = getattr(attention_tocha, f"head_{h}")
-                    head.q_proj_bias.data = bq.detach().numpy()
-                    head.k_proj_bias.data = bk.detach().numpy()
-                    head.v_proj_bias.data = bv.detach().numpy()
-            attention_tocha.out_proj_weight.data = out_weight.t().detach().numpy()
+                    head.q_proj_bias.data = bq.detach().numpy().copy()
+                    head.k_proj_bias.data = bk.detach().numpy().copy()
+                    head.v_proj_bias.data = bv.detach().numpy().copy()
+            attention_tocha.out_proj_weight.data = out_weight.t().detach().numpy().copy()
             if bias:
-                attention_tocha.out_proj_bias.data = out_bias.detach().numpy()
+                attention_tocha.out_proj_bias.data = out_bias.detach().numpy().copy()
 
             out_tocha = attention_tocha(q_tocha, k_tocha, v_tocha, attn_mask=mask_tocha)
             out_torch = attention_torch(q_torch, k_torch, v_torch, attn_mask=mask_torch)[0]

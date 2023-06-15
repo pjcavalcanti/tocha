@@ -27,8 +27,8 @@ class LayerNormTest(unittest.TestCase):
             norm_torch = torch.nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=elementwise_affine, dtype=torch.float64)
             norm_tocha = tocha.nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=elementwise_affine)
             if elementwise_affine:
-                norm_tocha.weight.data = norm_torch.weight.detach().numpy()
-                norm_tocha.bias.data = norm_torch.bias.detach().numpy()
+                norm_tocha.weight.data = norm_torch.weight.detach().numpy().copy()
+                norm_tocha.bias.data = norm_torch.bias.detach().numpy().copy()
             out_tocha = norm_tocha(x_tocha)
             out_torch = norm_torch(x_torch)
 

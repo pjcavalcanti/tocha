@@ -40,16 +40,16 @@ class TestRNN(unittest.TestCase):
             for name, p in rnn_torch.named_parameters():
                 if name.startswith("weight_ih_l"):
                     l = int(name[11:])
-                    vars(rnn)[f"cell_{l}"].weight_ih.data = p.detach().numpy().transpose((1, 0))
+                    vars(rnn)[f"cell_{l}"].weight_ih.data = p.detach().numpy().transpose((1, 0)).copy()
                 if name.startswith("weight_hh_l"):
                     l = int(name[11:])
-                    vars(rnn)[f"cell_{l}"].weight_hh.data = p.detach().numpy().transpose((1, 0))
+                    vars(rnn)[f"cell_{l}"].weight_hh.data = p.detach().numpy().transpose((1, 0)).copy()
                 if name.startswith("bias_ih_l"):
                     l = int(name[9:])
-                    vars(rnn)[f"cell_{l}"].bias_ih.data = p.detach().numpy()
+                    vars(rnn)[f"cell_{l}"].bias_ih.data = p.detach().numpy().copy()
                 if name.startswith("bias_hh_l"):
                     l = int(name[9:])
-                    vars(rnn)[f"cell_{l}"].bias_hh.data = p.detach().numpy()
+                    vars(rnn)[f"cell_{l}"].bias_hh.data = p.detach().numpy().copy()
 
             out = rnn(x)
             out_torch = rnn_torch(x_torch)
@@ -98,16 +98,16 @@ class TestRNN(unittest.TestCase):
             for name, p in rnn_torch.named_parameters():
                 if name.startswith("weight_ih_l"):
                     l = int(name[11:])
-                    vars(rnn)[f"cell_{l}"].weight_ih.data = p.detach().numpy().transpose((1, 0))
+                    vars(rnn)[f"cell_{l}"].weight_ih.data = p.detach().numpy().transpose((1, 0)).copy()
                 if name.startswith("weight_hh_l"):
                     l = int(name[11:])
-                    vars(rnn)[f"cell_{l}"].weight_hh.data = p.detach().numpy().transpose((1, 0))
+                    vars(rnn)[f"cell_{l}"].weight_hh.data = p.detach().numpy().transpose((1, 0)).copy()
                 if name.startswith("bias_ih_l"):
                     l = int(name[9:])
-                    vars(rnn)[f"cell_{l}"].bias_ih.data = p.detach().numpy()
+                    vars(rnn)[f"cell_{l}"].bias_ih.data = p.detach().numpy().copy()
                 if name.startswith("bias_hh_l"):
                     l = int(name[9:])
-                    vars(rnn)[f"cell_{l}"].bias_hh.data = p.detach().numpy()
+                    vars(rnn)[f"cell_{l}"].bias_hh.data = p.detach().numpy().copy()
 
             out = rnn(x)
             out_torch = rnn_torch(x_torch)

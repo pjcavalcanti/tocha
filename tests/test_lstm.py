@@ -31,10 +31,10 @@ class TestLSTMCell(unittest.TestCase):
                 
                 chunks = torch.chunk(p, 4, dim=0)
                 
-                vars(vars(lstm_man)[f"cell{l}"])[f"i_{weightorbias}_{iorh}"].data = chunks[0].t().detach().numpy()
-                vars(vars(lstm_man)[f"cell{l}"])[f"f_{weightorbias}_{iorh}"].data = chunks[1].t().detach().numpy()
-                vars(vars(lstm_man)[f"cell{l}"])[f"g_{weightorbias}_{iorh}"].data = chunks[2].t().detach().numpy()
-                vars(vars(lstm_man)[f"cell{l}"])[f"o_{weightorbias}_{iorh}"].data = chunks[3].t().detach().numpy()
+                vars(vars(lstm_man)[f"cell{l}"])[f"i_{weightorbias}_{iorh}"].data = chunks[0].t().detach().numpy().copy()
+                vars(vars(lstm_man)[f"cell{l}"])[f"f_{weightorbias}_{iorh}"].data = chunks[1].t().detach().numpy().copy()
+                vars(vars(lstm_man)[f"cell{l}"])[f"g_{weightorbias}_{iorh}"].data = chunks[2].t().detach().numpy().copy()
+                vars(vars(lstm_man)[f"cell{l}"])[f"o_{weightorbias}_{iorh}"].data = chunks[3].t().detach().numpy().copy()
 
             # forward
             xnp = np.random.randn(seq_len, batch_size, input_size).astype(np.float32)

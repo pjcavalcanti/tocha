@@ -67,13 +67,13 @@ class TestTransformerDecoderLayer(unittest.TestCase):
             
 
 def equate_tocha_to_torch_linear(toch, torc):
-    toch.weights.data = torc.weight.T.detach().numpy()
-    toch.bias.data = torc.bias.detach().numpy()
+    toch.weights.data = torc.weight.T.detach().numpy().copy()
+    toch.bias.data = torc.bias.detach().numpy().copy()
 
 
 def equate_tocha_to_torch_layer_norm(toch, torc):
-    toch.weight.data = torc.weight.detach().numpy()
-    toch.bias.data = torc.bias.detach().numpy()
+    toch.weight.data = torc.weight.detach().numpy().copy()
+    toch.bias.data = torc.bias.detach().numpy().copy()
 
 
 def equate_tocha_to_torch_attention(toch, torc, bias, num_heads):
@@ -99,31 +99,31 @@ def equate_tocha_to_torch_attention(toch, torc, bias, num_heads):
 
     for h, (wq, wk, wv) in enumerate(zip(head_wq, head_wk, head_wv)):
         head = getattr(toch, f"head_{h}")
-        head.q_proj_weight.data = wq.detach().numpy()
-        head.k_proj_weight.data = wk.detach().numpy()
-        head.v_proj_weight.data = wv.detach().numpy()
+        head.q_proj_weight.data = wq.detach().numpy().copy()
+        head.k_proj_weight.data = wk.detach().numpy().copy()
+        head.v_proj_weight.data = wv.detach().numpy().copy()
     if bias:
         for h, (bq, bk, bv) in enumerate(zip(head_bq, head_bk, head_bv)):
             head = getattr(toch, f"head_{h}")
-            head.q_proj_bias.data = bq.detach().numpy()
-            head.k_proj_bias.data = bk.detach().numpy()
-            head.v_proj_bias.data = bv.detach().numpy()
-    toch.out_proj_weight.data = out_weight.t().detach().numpy()
+            head.q_proj_bias.data = bq.detach().numpy().copy()
+            head.k_proj_bias.data = bk.detach().numpy().copy()
+            head.v_proj_bias.data = bv.detach().numpy().copy()
+    toch.out_proj_weight.data = out_weight.t().detach().numpy().copy()
     if bias:
-        toch.out_proj_bias.data = out_bias.detach().numpy()
+        toch.out_proj_bias.data = out_bias.detach().numpy().copy()
 
 
 def equate_tocha_to_torch_transformer_encoder_layer(toch, torc):
     equate_tocha_to_torch_attention(toch.self_attn, torc.self_attn, True, toch.nhead)
 
-    toch.linear1.weights.data = torc.linear1.weight.T.detach().numpy()
-    toch.linear1.bias.data = torc.linear1.bias.detach().numpy()
-    toch.linear2.weights.data = torc.linear2.weight.T.detach().numpy()
-    toch.linear2.bias.data = torc.linear2.bias.detach().numpy()
-    toch.norm1.weight.data = torc.norm1.weight.detach().numpy()
-    toch.norm1.bias.data = torc.norm1.bias.detach().numpy()
-    toch.norm2.weight.data = torc.norm2.weight.detach().numpy()
-    toch.norm2.bias.data = torc.norm2.bias.detach().numpy()
+    toch.linear1.weights.data = torc.linear1.weight.T.detach().numpy().copy()
+    toch.linear1.bias.data = torc.linear1.bias.detach().numpy().copy()
+    toch.linear2.weights.data = torc.linear2.weight.T.detach().numpy().copy()
+    toch.linear2.bias.data = torc.linear2.bias.detach().numpy().copy()
+    toch.norm1.weight.data = torc.norm1.weight.detach().numpy().copy()
+    toch.norm1.bias.data = torc.norm1.bias.detach().numpy().copy()
+    toch.norm2.weight.data = torc.norm2.weight.detach().numpy().copy()
+    toch.norm2.bias.data = torc.norm2.bias.detach().numpy().copy()
 
 def equate_tocha_to_torch_transformer_decoder_layer(toch, torc, nhead):
     equate_tocha_to_torch_attention(
