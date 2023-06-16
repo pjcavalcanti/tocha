@@ -54,8 +54,8 @@ class SGD(Optimizer):
         momentum: float = 0,
         nesterov: bool = False,
     ) -> None:
-        # assert lr > 0
-        # assert momentum >= 0 and momentum <= 1
+        assert lr > 0
+        assert momentum >= 0 and momentum <= 1
         self.momentum = momentum
         self.lr = lr
         self.params = list(params)
@@ -63,12 +63,9 @@ class SGD(Optimizer):
 
     def step(self):
         for i, p in enumerate(self.params):
-            # In Sutskever et al. we have
-            # self.v[i] = self.momentum * self.v[i] - self.lr * p.grad.data
-            # p.data += self.v[i]
-            # self.v[i] = self.momentum * self.v[i] + p.grad.data
-            # p.data = p.data - self.lr * self.v[i]
-            p.data += - self.lr * p.grad.data
+            # In Sutskever et al. we have differently, but I will mirror pytorch
+            self.v[i] = self.momentum * self.v[i] + p.grad.data
+            p.data = p.data - self.lr * self.v[i]
 
 
 # generate circular data
@@ -109,8 +106,8 @@ X_torch = torch.tensor(X)
 Y_torch = torch.tensor(Y)
 
 # Train
-lr = 0.01
-momentum = 0
+lr = 0.1
+momentum = 0.9
 mlp_tocha = MLP_tocha(2, 10, 1)
 mlp_torch = MLP_torch(2, 10, 1, dtype=torch.float64)
 equate_tocha_to_torch_linear(mlp_tocha.fc1, mlp_torch.fc1)
@@ -138,12 +135,6 @@ print(type(X_tocha.data.dtype), type(X_torch.data.dtype))
 losses_tocha = []
 losses_torch = []
 
-# for n,p in mlp_tocha.named_parameters():
-#     print(n, p.shape)
-# print("=================")
-# for n,p in mlp_torch.named_parameters():
-#     print(n, p.shape)
-# print("=================")
 for p in mlp_tocha.parameters():
     print(p.shape)
 for p in mlp_torch.parameters():
@@ -151,41 +142,7 @@ for p in mlp_torch.parameters():
 print(f"{optimizer_tocha.lr=}")
 print(f"{optimizer_torch.param_groups[0]['lr']=}")
 
-for epoch in range(2):
-    # num_samples = 500
-
-    # # Inner circle
-    # inner_radius = 2
-    # inner_angle = np.random.uniform(0, 2 * np.pi, num_samples // 2)
-    # inner_x = inner_radius * np.cos(inner_angle)
-    # inner_y = inner_radius * np.sin(inner_angle)
-    # X_inner = np.column_stack([inner_x, inner_y])
-    # Y_inner = np.zeros((num_samples // 2, 1))
-
-    # # Outer circle
-    # outer_radius = 5
-    # outer_angle = np.random.uniform(0, 2 * np.pi, num_samples // 2)
-    # outer_x = outer_radius * np.cos(outer_angle)
-    # outer_y = outer_radius * np.sin(outer_angle)
-    # X_outer = np.column_stack([outer_x, outer_y])
-    # Y_outer = np.ones((num_samples // 2, 1))
-
-    # # Concatenate inner and outer circle
-    # X = np.vstack([X_inner, X_outer]).astype(np.float64)
-    # Y = np.vstack([Y_inner, Y_outer]).astype(np.float64)
-
-    # # add Gaussian noise
-    # X += np.random.normal(0, 0.3, size=X.shape)
-
-    # X = X.astype(np.float64)
-    # Y = Y.astype(np.float64)
-
-    # # go to tensors
-    # X_tocha = tocha.tensor(X)
-    # Y_tocha = tocha.tensor(Y)
-    # X_torch = torch.tensor(X)
-    # Y_torch = torch.tensor(Y)
-
+for epoch in range(300):
     idx = np.random.randint(0, len(X), (32,))
 
     x_tocha = X_tocha[idx]
@@ -200,29 +157,12 @@ for epoch in range(2):
     loss_torch = ((y_pred_torch - y_torch) * (y_pred_torch - y_torch)).sum()
     losses_torch.append(loss_torch.item())
 
-    # print("Comparing parameters")
-    # for (n1, p1), (n2, p2) in zip(mlp_tocha.named_parameters(), mlp_torch.named_parameters()):
-    #     if "bias" in n1:
-    #         print(n1, np.allclose(p1.data, p2.detach().numpy()))
-    #     else:
-    #         print(n1, np.allclose(p1.data, p2.detach().T.numpy()))
-    # print("----------")
-    # for p in mlp_tocha.parameters():
-    #     p.zero_grad()
     optimizer_tocha.zero_grad()
     loss_tocha.backward()
-    # optimizer_tocha.step()
-    # for p in mlp_tocha.parameters():
-    #     p.data += - lr * p.grad.data
-    for n, p in mlp_tocha.named_parameters():
-        p.data += - lr * p.grad.data
-        # print(f"TOCHA {n} GRAD: {(lr * p.grad.data).sum()}")
+    optimizer_tocha.step()
 
     optimizer_torch.zero_grad()
     loss_torch.backward()
-    # for n, p in mlp_torch.named_parameters():
-    #     p.data += - lr * p.grad.data
-    #     print(f"TORCH {n} GRAD: {(lr * p.grad.data).sum()}")
     optimizer_torch.step()
 
     # print(loss_tocha.data, loss_torch.item())
@@ -248,8 +188,8 @@ for epoch in range(2):
 # plt.scatter(X[:, 0], X[:, 1], c=Y[:, 0], edgecolors="k")
 # plt.show()
 
-# plt.cla()
-# plt.plot(losses_tocha, label="tocha")
-# plt.plot(losses_torch, label="torch")
-# plt.legend()
-# plt.show()
+plt.cla()
+plt.plot(losses_tocha, label="tocha")
+plt.plot(losses_torch, label="torch")
+plt.legend()
+plt.show()
