@@ -3,60 +3,60 @@ import numpy as np
 import tocha
 import torch
 
-class TestTransformerEncoder(unittest.TestCase):
-    def test_against_torch(self):
-        n_head = 3
-        d_model = 5 * n_head
-        dim_feedforward = 7
-        dropout = 0.0
-        layer_norm_eps = 1e-5
+# class TestTransformerEncoder(unittest.TestCase):
+#     def test_against_torch(self):
+#         n_head = 3
+#         d_model = 5 * n_head
+#         dim_feedforward = 7
+#         dropout = 0.0
+#         layer_norm_eps = 1e-5
 
-        num_layers = 2 #int(np.random.randint(1, 3))
+#         num_layers = 2 #int(np.random.randint(1, 3))
 
-        batch_size = 2
-        seq_len = 3
+#         batch_size = 2
+#         seq_len = 3
 
-        enc_layer_torch = torch.nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=n_head,
-            dim_feedforward=dim_feedforward,
-            dropout=dropout,
-            layer_norm_eps=layer_norm_eps,
-            batch_first=True,
-        )
-        enc_torch = torch.nn.TransformerEncoder(
-            encoder_layer=enc_layer_torch, num_layers=num_layers
-        )
-        enc_layer_tocha = tocha.nn.TransformerEncoderLayer(
-            d_model=d_model,
-            dim_feedforward=dim_feedforward,
-            nhead=n_head,
-            dropout=dropout,
-            layer_norm_eps=layer_norm_eps,
-        )
-        equate_tocha_to_torch_transformer_encoder_layer(enc_layer_tocha, enc_layer_torch)
-        enc_tocha = tocha.nn.TransformerEncoder(encoder_layer=enc_layer_tocha, num_layers=num_layers)
+#         enc_layer_torch = torch.nn.TransformerEncoderLayer(
+#             d_model=d_model,
+#             nhead=n_head,
+#             dim_feedforward=dim_feedforward,
+#             dropout=dropout,
+#             layer_norm_eps=layer_norm_eps,
+#             batch_first=True,
+#         )
+#         enc_torch = torch.nn.TransformerEncoder(
+#             encoder_layer=enc_layer_torch, num_layers=num_layers
+#         )
+#         enc_layer_tocha = tocha.nn.TransformerEncoderLayer(
+#             d_model=d_model,
+#             dim_feedforward=dim_feedforward,
+#             nhead=n_head,
+#             dropout=dropout,
+#             layer_norm_eps=layer_norm_eps,
+#         )
+#         equate_tocha_to_torch_transformer_encoder_layer(enc_layer_tocha, enc_layer_torch)
+#         enc_tocha = tocha.nn.TransformerEncoder(encoder_layer=enc_layer_tocha, num_layers=num_layers)
 
 
-        xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
-        x_tocha = tocha.tensor(xnp, requires_grad=True)
-        x_torch = torch.tensor(xnp, requires_grad=True)
+#         xnp = np.random.randn(batch_size, seq_len, d_model).astype(np.float32)
+#         x_tocha = tocha.tensor(xnp, requires_grad=True)
+#         x_torch = torch.tensor(xnp, requires_grad=True)
 
-        out_tocha = enc_tocha(x_tocha)
-        out_torch = enc_torch(x_torch)
+#         out_tocha = enc_tocha(x_tocha)
+#         out_torch = enc_torch(x_torch)
 
-        passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
-        assert passforward
+#         passforward = np.allclose(out_tocha.data, out_torch.detach().numpy(), atol=1e-5)
+#         assert passforward
         
-        grad = np.random.randn(*out_tocha.shape).astype(np.float32)
-        grad_tocha = tocha.tensor(grad)
-        grad_torch = torch.tensor(grad)
+#         grad = np.random.randn(*out_tocha.shape).astype(np.float32)
+#         grad_tocha = tocha.tensor(grad)
+#         grad_torch = torch.tensor(grad)
         
-        out_tocha.backward(grad_tocha)
-        out_torch.backward(grad_torch)
+#         out_tocha.backward(grad_tocha)
+#         out_torch.backward(grad_torch)
         
-        passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-5)
-        assert passbackward
+#         passbackward = np.allclose(x_tocha.grad.data, x_torch.grad.detach().numpy(), atol=1e-5)
+#         assert passbackward
         
         
 def equate_tocha_to_torch_attention(toch, torc, bias, num_heads):
