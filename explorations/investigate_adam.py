@@ -2,12 +2,13 @@ import torch
 from torch.optim.optimizer import Optimizer
 
 import tocha
+from tocha.module import Parameter
 from tocha.nn import Module
 import tocha.functional as F
 from tocha import Tensor
 from tocha.optim import Optimizer
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable, Optional, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -77,6 +78,38 @@ class MLP_tocha(tocha.nn.Module):
         x = self.fc2(x)
         return x
     
+class Adam(Optimizer):
+    def __init__(self, params: Iterable[Parameter], lr: float, betas:Tuple[float,float], eps: float=1e-8, weight_decay:Optional[float]=None) -> None:
+        self.params = list(params)
+        self.lr = lr
+        self.beta1 = betas[0]
+        self.beta2 = betas[1]
+        self.eps = eps
+        self.weight_decay = weight_decay if (weight_decay is not None and weight_decay != 0) else None
+        
+        self.m = [np.zeros_like(p.data) for p in self.params]
+        self.v = [np.zeros_like(p.data) for p in self.params]
+        self.t = 0
+        
+    def zero_grad(self) -> None:
+        for p in self.params:
+            p.zero_grad()
+    def step(self):
+        self.t += 1
+        if self.weight_decay is None:
+            for i, p in enumerate(self.params):
+                g_t = p.grad.data
+                self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * g_t
+                self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * (g_t * g_t)
+                m_hat = self.m[i] / (1 - self.beta1 ** self.t)
+                v_hat = self.v[i] / (1 - self.beta2 ** self.t)
+                p.data += - self.lr * m_hat / (np.sqrt(v_hat) + self.eps)
+        else:
+            for i, p in enumerate(self.params):
+                g_t = p.grad.data + self.weight_decay * p.data      
+                self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * g_t
+                self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * g_t**2
+                p.data += - self.lr * (self.m[i]/(1 - self.beta1 ** self.t)) / (np.sqrt(self.v[i]/(1 - self.beta2 ** self.t)) + self.eps)   
     
 class Adam_torch():
     def __init__(self, params, lr, betas, eps, weight_decay=None) -> None:
@@ -99,11 +132,14 @@ class Adam_torch():
         self.t = self.t + 1
         if self.weight_decay is None:
             for i, p in enumerate(self.params):
-                print("a")
-                g_t = p.grad
+                g_t = p.grad.data
                 self.m[i] = self.beta1 * self.m[i] + (1 - self.beta1) * g_t
                 self.v[i] = self.beta2 * self.v[i] + (1 - self.beta2) * g_t**2
+                m_hat = self.m[i] / (1 - self.beta1 ** self.t)
+                v_hat = self.v[i] / (1 - self.beta2 ** self.t)
+                delta = self.lr * (self.m[i] / (1 - self.beta1 ** self.t)) / (torch.sqrt(self.v[i] / (1 - self.beta2 ** self.t)) + self.eps)
                 p.data += - self.lr * (self.m[i] / (1 - self.beta1 ** self.t)) / (torch.sqrt(self.v[i] / (1 - self.beta2 ** self.t)) + self.eps)
+            print(f"torch: {m_hat.item()=}, {v_hat.item()=}, {delta.item()=}")
         else:
             for i, p in enumerate(self.params):
                 g_t = p.grad + self.weight_decay * p.data
@@ -181,49 +217,101 @@ def adam_tocha_vs_torch():
     beta1 = 0.9
     beta2 = 0.999
     eps = 1e-8
-    weight_decay = 0.1
+    weight_decay = 0.0
 
-    epochs = 5
+    epochs = 100
     batch_size = 5
 
     X_torch, Y_torch = generate_data(N, noise)
     X_tocha, Y_tocha = tocha.tensor(X_torch.clone().numpy()), tocha.tensor(Y_torch.clone().numpy())
     
-    # print(np.allclose(X_torch.detach().numpy(), X_tocha.data))
-    # print(np.allclose(Y_torch.detach().numpy(), Y_tocha.data))
-    
     mlp_torch = MLP_torch(n_in, n_hidden, n_out)
     mlp_tocha = MLP_tocha(n_in, n_hidden, n_out)
     equate_mlp_tocha_torch(mlp_tocha, mlp_torch)
     
-    # print(mlp_torch(X_torch[:5]), mlp_tocha(X_tocha[:5]))
-    
     adam_torch = torch.optim.Adam(params=mlp_torch.parameters(), lr=alpha, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
-    # optimizer2 = Adam_torch(params=mlp_tocha.parameters(), lr=alpha, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
-
+    adam_tocha = Adam(params=mlp_tocha.parameters(), lr=alpha, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
+        
     losses = []
     for e in tqdm(range(epochs)):
-        idx = np.random.randint(0, X_torch.shape[0], (batch_size,))
+        idx = torch.randint(0, X_torch.shape[0], (batch_size,))
         x_torch, y_torch = X_torch[idx], Y_torch[idx].view(-1, 1)
         x_tocha, y_tocha = X_tocha[idx], Y_tocha[idx].reshape((-1, 1))
         
         y_pred_torch = mlp_torch(x_torch)
-        y_pred_tocha = mlp_tocha(x_tocha)
+        y_pred_tocha = mlp_tocha(x_tocha)        
         loss_torch = torch.nn.functional.binary_cross_entropy_with_logits(y_pred_torch, y_torch)
         loss_tocha = F.binary_cross_entropy_with_logits(y_pred_tocha, y_tocha)
- 
-        print(loss_torch.item(), loss_tocha.data)
         
         
-        # adam_torch.zero_grad()
-        # loss1.backward()
-        # adam_torch.step()
-        
-        # optimizer2.zero_grad()
-        # loss2.backward()
-        # optimizer2.step()
+        adam_torch.zero_grad()
+        loss_torch.backward()
+        adam_torch.step()
 
-        # print(torch.allclose(loss_torch, loss_tocha))
+        adam_tocha.zero_grad()
+        loss_tocha.backward()
+        adam_tocha.step()
+        
+        print(np.allclose(loss_torch.detach().numpy(), loss_tocha.data))
     losses.append(loss_torch.item())
 
-adam_tocha_vs_torch()
+def longer_test_vs_torch():
+    
+    def equate_mlp_tocha_torch(mlp_toch: MLP_tocha, mlp_torc: MLP_torch):
+            mlp_toch.fc1.weights.data = mlp_torc.fc1.weight.clone().T.detach().numpy()
+            mlp_toch.fc1.bias.data = mlp_torc.fc1.bias.clone().detach().numpy()
+            mlp_toch.fc2.weights.data = mlp_torc.fc2.weight.clone().T.detach().numpy()
+            mlp_toch.fc2.bias.data = mlp_torc.fc2.bias.clone().detach().numpy()
+    
+    for _ in range(10):
+        N = int(torch.randint(0,50,(1,)))
+        noise = torch.rand(1).item()
+        n_in = 2
+        n_hidden = int(torch.randint(2,6,(1,)))
+        n_out = 1
+        alpha = 0.01 * torch.rand(1).item()
+        beta1 = 0.9 * torch.rand(1).item()
+        beta2 = 0.999 * torch.rand(1).item()
+        eps = 1e-8 * torch.rand(1).item()
+        weight_decay = 0.01 * torch.rand(1).item()
+        if torch.rand(1).item() > 0.5:
+            weight_decay = 0.0
+        epochs = 50
+        
+        batch_size = 5
+
+        X_torch, Y_torch = generate_data(N, noise)
+        X_tocha, Y_tocha = tocha.tensor(X_torch.clone().numpy()), tocha.tensor(Y_torch.clone().numpy())
+        
+        mlp_torch = MLP_torch(n_in, n_hidden, n_out)
+        mlp_tocha = MLP_tocha(n_in, n_hidden, n_out)
+        equate_mlp_tocha_torch(mlp_tocha, mlp_torch)
+        
+        adam_torch = torch.optim.Adam(params=mlp_torch.parameters(), lr=alpha, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
+        adam_tocha = Adam(params=mlp_tocha.parameters(), lr=alpha, betas=(beta1, beta2), eps=eps, weight_decay=weight_decay)
+            
+        losses = []
+        for e in tqdm(range(epochs)):
+            idx = torch.randint(0, X_torch.shape[0], (batch_size,))
+            x_torch, y_torch = X_torch[idx], Y_torch[idx].view(-1, 1)
+            x_tocha, y_tocha = X_tocha[idx], Y_tocha[idx].reshape((-1, 1))
+            
+            y_pred_torch = mlp_torch(x_torch)
+            y_pred_tocha = mlp_tocha(x_tocha)        
+            loss_torch = torch.nn.functional.binary_cross_entropy_with_logits(y_pred_torch, y_torch)
+            loss_tocha = F.binary_cross_entropy_with_logits(y_pred_tocha, y_tocha)
+            
+            
+            adam_torch.zero_grad()
+            loss_torch.backward()
+            adam_torch.step()
+
+            adam_tocha.zero_grad()
+            loss_tocha.backward()
+            adam_tocha.step()
+            
+            print(f"parameters: {N, noise, n_in, n_hidden, n_out, alpha, beta1, beta2, eps, weight_decay}")
+            assert(np.allclose(loss_torch.detach().numpy(), loss_tocha.data)), "Losses are not equal"
+
+
+longer_test_vs_torch()
