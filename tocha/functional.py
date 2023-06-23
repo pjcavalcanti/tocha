@@ -59,6 +59,12 @@ def softmax(t1: Tensor, dim: Union[int, Tuple[int,...]]) -> Tensor:
     t2 = t2 / t2.sum(axis=dim, keepdims=True)
     return t2
 
+def binary_cross_entropy_with_logits(x: Tensor, y: Tensor) -> Tensor:
+    out = sigmoid(x)
+    print(f"{out=},\n{log(out)=},\n{y=},\n{(1-y)=},\n{1-out},\n{log(1-out)=}")
+    # print("\n")
+    return - (y * log(out) + (1 - y) * log(1 - out)).mean()
+
 def cross_entropy(x: Tensor, y: Tensor) -> Tensor:
     # TODO make unit tests
     out = softmax(x, dim=1)
