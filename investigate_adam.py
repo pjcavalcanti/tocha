@@ -209,10 +209,8 @@ def adam_tocha_vs_torch():
         
         y_pred_torch = mlp_torch(x_torch)
         y_pred_tocha = mlp_tocha(x_tocha)
-        # print(np.allclose(y_pred_torch.detach().numpy(), y_pred_tocha.data))
         loss_torch = torch.nn.functional.binary_cross_entropy_with_logits(y_pred_torch, y_torch)
         loss_tocha = F.binary_cross_entropy_with_logits(y_pred_tocha, y_tocha)
-        # losses.append(loss_torch.item())
  
         print(loss_torch.item(), loss_tocha.data)
         

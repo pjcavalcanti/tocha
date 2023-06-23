@@ -144,7 +144,7 @@ class Tensor:
         return sub(self, ensure_tensor(other))
 
     def __rsub__(self, other: Tensorable) -> "Tensor":
-        return sub(self, ensure_tensor(other))
+        return sub(ensure_tensor(other), self)  # not commutative
 
     def __mul__(self, other: Tensorable) -> "Tensor":
         return mul(self, ensure_tensor(other))
